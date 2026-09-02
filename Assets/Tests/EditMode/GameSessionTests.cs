@@ -55,6 +55,35 @@ namespace CloudWhale.Tests
             Assert.That(session.LastReason, Is.EqualTo(GameReason.InsufficientResources));
         }
 
+        [Test]
+        public void DefaultFoundationCost_RequiresEveryResource_AndIsDeductedOnlyOnce()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var cost = ProductionSettings.Default.HouseFoundationCost.Resources;
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+
+            Assert.That(cost.Driftwood, Is.GreaterThan(0));
+            Assert.That(cost.CloudCotton, Is.GreaterThan(0));
+            Assert.That(cost.Dew, Is.GreaterThan(0));
+            Assert.That(cost.Stardust, Is.GreaterThan(0));
+            Assert.That(session.TryBuildHouseFoundation(), Is.False);
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.InsufficientResources));
+
+            session.AddResources(new ResourceAmounts(
+                cost.Driftwood + 1,
+                cost.CloudCotton + 1,
+                cost.Dew + 1,
+                cost.Stardust + 1));
+
+            Assert.That(session.TryBuildHouseFoundation(), Is.True);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Foundation));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(1, 1, 1, 1)));
+            Assert.That(session.TryBuildHouseFoundation(), Is.False);
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(1, 1, 1, 1)));
+        }
+
         [TestCase("{not-json}")]
         [TestCase("{\"version\":1,\"savedAtUnixSeconds\":1,\"driftwood\":-1,\"cloudCotton\":0,\"dew\":0,\"stardust\":0,\"houseStage\":0}")]
         [TestCase("{\"version\":1,\"savedAtUnixSeconds\":1,\"driftwood\":0,\"cloudCotton\":0,\"dew\":0,\"stardust\":0,\"houseStage\":99}")]
