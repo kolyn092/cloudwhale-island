@@ -1,7 +1,7 @@
 {
   "name": "CloudWhale.EditModeTests",
   "rootNamespace": "CloudWhale.Tests",
-  "references": [],
+  "references": ["CloudWhale.Game"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
