@@ -100,6 +100,41 @@ namespace CloudWhale.Tests
             Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
         }
 
+        [TestCase("driftwood")]
+        [TestCase("cloudCotton")]
+        [TestCase("dew")]
+        [TestCase("stardust")]
+        public void Load_MissingRequiredResourceField_RecoversInvalidSave(string missingField)
+        {
+            var storage = new InMemoryStorage
+            {
+                Value = "{\"version\":1,\"savedAtUnixSeconds\":1,"
+                    + ResourceFieldsExcept(missingField)
+                    + "\"houseStage\":0}"
+            };
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.State.Resources, Is.EqualTo(ResourceAmounts.Zero));
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Unbuilt));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+        }
+
+        [Test]
+        public void Load_NonNumericRequiredResourceField_RecoversInvalidSave()
+        {
+            var storage = new InMemoryStorage
+            {
+                Value = "{\"version\":1,\"savedAtUnixSeconds\":1,\"driftwood\":\"0\",\"cloudCotton\":0,\"dew\":0,\"stardust\":0,\"houseStage\":0}"
+            };
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+        }
+
         [Test]
         public void StorageWriteFailure_DoesNotStopPlay_AndExposesNonSavingReason()
         {
@@ -203,6 +238,18 @@ namespace CloudWhale.Tests
         {
             public ManualClock(DateTime utcNow) { UtcNow = utcNow; }
             public DateTime UtcNow { get; set; }
+        }
+
+        private static string ResourceFieldsExcept(string missingField)
+        {
+            var fields = new[] { "driftwood", "cloudCotton", "dew", "stardust" };
+            var result = string.Empty;
+            foreach (var field in fields)
+            {
+                if (field != missingField) result += string.Format("\"{0}\":0,", field);
+            }
+
+            return result;
         }
 
         private sealed class InMemoryStorage : IStateStorage
