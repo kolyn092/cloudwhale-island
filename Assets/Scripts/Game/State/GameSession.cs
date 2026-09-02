@@ -56,6 +56,8 @@ namespace CloudWhale.Game
         public GameReason LastReason { get; private set; }
         public GameStateSnapshot State => ToSnapshot(data ?? GameStateData.Fresh(clock.UtcNow));
         public int ProductionIntervalSeconds => production.IntervalSeconds;
+        // Presentation reads this value only; TryBuildHouseFoundation remains the sole mutation boundary.
+        public HouseFoundationCost HouseFoundationCost => production.HouseFoundationCost;
 
         public void Load()
         {
