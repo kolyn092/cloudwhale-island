@@ -1,6 +1,7 @@
 using System;
 using NUnit.Framework;
 using CloudWhale.Game;
+using UnityEngine;
 
 namespace CloudWhale.Tests
 {
@@ -144,6 +145,29 @@ namespace CloudWhale.Tests
             session.Load();
 
             Assert.That(session.LastReason, Is.EqualTo(GameReason.StorageUnavailable));
+        }
+
+        [Test]
+        public void RuntimeProductionBehaviour_TicksConfiguredProduction_AndPersists()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var gameObject = new GameObject("production-runtime-test");
+            try
+            {
+                var runtime = gameObject.AddComponent<OpenGameProductionRuntime>();
+                runtime.Initialize(storage, clock, new ProductionSettings(30, 2, HouseFoundationCost.Zero));
+                var writesAfterLoad = storage.WriteCount;
+                clock.UtcNow = clock.UtcNow.AddSeconds(30);
+
+                Assert.That(runtime.TickNow(), Is.True);
+                Assert.That(runtime.Session.State.Resources.Driftwood, Is.EqualTo(2));
+                Assert.That(storage.WriteCount, Is.EqualTo(writesAfterLoad + 1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
         }
 
         private sealed class ManualClock : IClock
