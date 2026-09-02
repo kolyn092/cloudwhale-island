@@ -115,6 +115,37 @@ namespace CloudWhale.Tests
             Assert.That(session.State.Resources.Driftwood, Is.EqualTo(1));
         }
 
+        [Test]
+        public void OpenGameProductionController_AdvancesAtConfiguredInterval_AndPersists()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, new ProductionSettings(60, 3, HouseFoundationCost.Zero));
+            session.Load();
+            var controller = new OpenGameProductionController(session, clock);
+            var writesAfterLoad = storage.WriteCount;
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(59);
+            Assert.That(controller.Tick(), Is.False);
+            clock.UtcNow = clock.UtcNow.AddSeconds(1);
+
+            Assert.That(controller.Tick(), Is.True);
+            Assert.That(session.State.Resources.Driftwood, Is.EqualTo(3));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesAfterLoad + 1));
+        }
+
+        [Test]
+        public void BrowserStorage_ReadFailure_IsNotTreatedAsAnAbsentKey()
+        {
+            var browserStorage = new BrowserLocalStorage("state", new FailingBrowserBridge());
+            var clock = new ManualClock(DateTime.UtcNow);
+            var session = new GameSession(browserStorage, clock, ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.StorageUnavailable));
+        }
+
         private sealed class ManualClock : IClock
         {
             public ManualClock(DateTime utcNow) { UtcNow = utcNow; }
@@ -125,11 +156,28 @@ namespace CloudWhale.Tests
         {
             public string Value;
             public bool FailWrites;
+            public int WriteCount;
             public bool TryRead(out string value, out string reason) { value = Value; reason = null; return true; }
             public bool TryWrite(string value, out string reason)
             {
                 if (FailWrites) { reason = "write failed"; return false; }
-                Value = value; reason = null; return true;
+                Value = value; WriteCount++; reason = null; return true;
+            }
+        }
+
+        private sealed class FailingBrowserBridge : IBrowserLocalStorageBridge
+        {
+            public bool TryRead(string key, out string value, out string reason)
+            {
+                value = null;
+                reason = "browser privacy mode blocked local storage";
+                return false;
+            }
+
+            public bool TryWrite(string key, string value, out string reason)
+            {
+                reason = "browser privacy mode blocked local storage";
+                return false;
             }
         }
     }

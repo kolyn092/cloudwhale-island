@@ -47,6 +47,7 @@ namespace CloudWhale.Game
 
         public GameReason LastReason { get; private set; }
         public GameStateSnapshot State => ToSnapshot(data ?? GameStateData.Fresh(clock.UtcNow));
+        public int ProductionIntervalSeconds => production.IntervalSeconds;
 
         public void Load()
         {
@@ -209,6 +210,29 @@ namespace CloudWhale.Game
         private static GameStateSnapshot ToSnapshot(GameStateData state)
         {
             return new GameStateSnapshot(new ResourceAmounts(state.driftwood, state.cloudCotton, state.dew, state.stardust), (HouseStage)state.houseStage, state.starlightParts);
+        }
+    }
+
+    /// <summary>Testable timer boundary for an open game. A MonoBehaviour can call Tick from Update.</summary>
+    public sealed class OpenGameProductionController
+    {
+        private readonly GameSession session;
+        private readonly IClock clock;
+        private DateTime nextProductionAt;
+
+        public OpenGameProductionController(GameSession session, IClock clock)
+        {
+            this.session = session ?? throw new ArgumentNullException(nameof(session));
+            this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            nextProductionAt = clock.UtcNow.AddSeconds(session.ProductionIntervalSeconds);
+        }
+
+        public bool Tick()
+        {
+            if (clock.UtcNow < nextProductionAt) return false;
+            session.AdvanceWhileOpen();
+            nextProductionAt = clock.UtcNow.AddSeconds(session.ProductionIntervalSeconds);
+            return true;
         }
     }
 }
