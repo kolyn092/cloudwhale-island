@@ -39,6 +39,19 @@ namespace CloudWhale.Tests
             Assert.That(presentation.View.StatusMessage, Does.Contain("Stardust 1"));
         }
 
+        [Test]
+        public void SessionFoundationCost_IsTheSameCostShownToThePresentation()
+        {
+            var configuredCost = new HouseFoundationCost(2, 3, 4, 5);
+            var session = CreateSession(configuredCost);
+            var presentation = new IslandPresentationController(session, session.HouseFoundationCost);
+
+            Assert.That(presentation.View.NextAction, Does.Contain("Driftwood 2"));
+            Assert.That(presentation.View.NextAction, Does.Contain("Cloud Cotton 3"));
+            Assert.That(presentation.View.NextAction, Does.Contain("Dew 4"));
+            Assert.That(presentation.View.NextAction, Does.Contain("Stardust 5"));
+        }
+
         private static GameSession CreateSession(HouseFoundationCost cost)
         {
             var session = new GameSession(new MemoryStorage(), new FixedClock(), new ProductionSettings(60, 1, cost));

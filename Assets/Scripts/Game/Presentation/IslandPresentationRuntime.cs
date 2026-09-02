@@ -6,7 +6,6 @@ namespace CloudWhale.Game.Presentation
     /// <summary>Creates the complete no-asset diorama and IMGUI overlay at runtime, so Main needs no manual wiring.</summary>
     public sealed class IslandPresentationRuntime : MonoBehaviour
     {
-        private readonly HouseFoundationCost displayedFoundationCost = HouseFoundationCost.Zero;
         private IslandPresentationController presentation;
         private GameObject foundation;
         private GUIStyle panelStyle;
@@ -31,7 +30,7 @@ namespace CloudWhale.Game.Presentation
                 production = FindFirstObjectByType<OpenGameProductionRuntime>();
             }
 
-            presentation = new IslandPresentationController(production.Session, displayedFoundationCost);
+            presentation = new IslandPresentationController(production.Session, production.Session.HouseFoundationCost);
             CreateDiorama();
             CreateStyles();
             ApplyHouseStage();
