@@ -14,7 +14,15 @@ namespace CloudWhale.Game
 
     public readonly struct ProductionSettings
     {
-        public static readonly ProductionSettings Default = new ProductionSettings(60, 1, HouseFoundationCost.Zero);
+        // Runtime tuning defaults. Keep the foundation cost nonzero so starting a new game
+        // still requires a production loop before a house can be built.
+        public const int DefaultIntervalSeconds = 60;
+        public const int DefaultAmountPerInterval = 1;
+        public static readonly HouseFoundationCost DefaultHouseFoundationCost = new HouseFoundationCost(5, 5, 5, 5);
+        public static readonly ProductionSettings Default = new ProductionSettings(
+            DefaultIntervalSeconds,
+            DefaultAmountPerInterval,
+            DefaultHouseFoundationCost);
 
         public ProductionSettings(int intervalSeconds, int amountPerInterval, HouseFoundationCost houseFoundationCost)
         {
