@@ -247,6 +247,16 @@ namespace CloudWhale.Game
             nextProductionAt = clock.UtcNow.AddSeconds(session.ProductionIntervalSeconds);
         }
 
+        /// <summary>Returns the whole seconds remaining until the next open-game production cycle.</summary>
+        public int SecondsUntilNextProduction
+        {
+            get
+            {
+                var remaining = nextProductionAt - clock.UtcNow;
+                return remaining <= TimeSpan.Zero ? 0 : (int)Math.Ceiling(remaining.TotalSeconds);
+            }
+        }
+
         public bool Tick()
         {
             if (clock.UtcNow < nextProductionAt) return false;

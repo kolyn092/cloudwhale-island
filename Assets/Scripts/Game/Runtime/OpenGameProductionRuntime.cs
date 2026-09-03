@@ -14,6 +14,7 @@ namespace CloudWhale.Game
         private OpenGameProductionController controller;
 
         public GameSession Session => session;
+        public int SecondsUntilNextProduction => controller == null ? 0 : controller.SecondsUntilNextProduction;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void StartAutomatically()
