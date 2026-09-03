@@ -10,6 +10,7 @@ namespace CloudWhale.Game.Presentation
         private static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
 
         private IslandPresentationController presentation;
+        private OpenGameProductionRuntime productionRuntime;
         private GameObject foundation;
         private GUIStyle panelStyle;
         private GUIStyle textStyle;
@@ -26,14 +27,14 @@ namespace CloudWhale.Game.Presentation
         private IEnumerator Start()
         {
             yield return null;
-            var production = FindFirstObjectByType<OpenGameProductionRuntime>();
-            while (production == null || production.Session == null)
+            productionRuntime = FindFirstObjectByType<OpenGameProductionRuntime>();
+            while (productionRuntime == null || productionRuntime.Session == null)
             {
                 yield return null;
-                production = FindFirstObjectByType<OpenGameProductionRuntime>();
+                productionRuntime = FindFirstObjectByType<OpenGameProductionRuntime>();
             }
 
-            presentation = new IslandPresentationController(production.Session, production.Session.HouseFoundationCost);
+            presentation = new IslandPresentationController(productionRuntime.Session, productionRuntime.Session.HouseFoundationCost);
             CreateDiorama();
             ApplyHouseStage();
         }
@@ -55,6 +56,9 @@ namespace CloudWhale.Game.Presentation
             GUI.Label(new Rect(38, 70, 360, 92), ResourceText(view.Resources), textStyle);
             GUI.Label(new Rect(38, 166, 360, 26), "House: " + (view.HouseStage == HouseStage.Foundation ? "Foundation" : "Unbuilt"), textStyle);
             GUI.Label(new Rect(38, 192, 360, 42), view.NextAction, textStyle);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            GUI.Label(new Rect(450, 20, 280, 28), "DEV · +1 each in " + productionRuntime.SecondsUntilNextProduction + "s", textStyle);
+#endif
             if (view.HouseStage == HouseStage.Unbuilt && GUI.Button(new Rect(38, 238, 190, 38), "Build foundation", buttonStyle))
             {
                 presentation.BuildFoundation();
