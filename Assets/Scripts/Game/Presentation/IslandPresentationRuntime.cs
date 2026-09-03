@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CloudWhale.Game.Presentation
@@ -6,6 +7,8 @@ namespace CloudWhale.Game.Presentation
     /// <summary>Creates the complete no-asset diorama and IMGUI overlay at runtime, so Main needs no manual wiring.</summary>
     public sealed class IslandPresentationRuntime : MonoBehaviour
     {
+        private static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
+
         private IslandPresentationController presentation;
         private GameObject foundation;
         private GUIStyle panelStyle;
@@ -32,7 +35,6 @@ namespace CloudWhale.Game.Presentation
 
             presentation = new IslandPresentationController(production.Session, production.Session.HouseFoundationCost);
             CreateDiorama();
-            CreateStyles();
             ApplyHouseStage();
         }
 
@@ -45,7 +47,8 @@ namespace CloudWhale.Game.Presentation
 
         private void OnGUI()
         {
-            if (presentation == null || panelStyle == null) return;
+            if (presentation == null) return;
+            if (panelStyle == null) CreateStyles();
             var view = presentation.View;
             GUI.Box(new Rect(20, 20, 410, 252), GUIContent.none, panelStyle);
             GUI.Label(new Rect(38, 34, 370, 28), "Cloudwhale Island", textStyle);
@@ -81,15 +84,13 @@ namespace CloudWhale.Game.Presentation
             light.type = LightType.Directional; light.intensity = 1.1f; light.shadows = LightShadows.Soft;
             light.transform.rotation = Quaternion.Euler(48, -32, 0);
 
-            var whale = CreatePrimitive(PrimitiveType.Capsule, "Sleeping Sky Whale", new Vector3(0, -1.6f, 0.4f), new Vector3(4.8f, 1.45f, 7.8f), new Color(0.33f, 0.55f, 0.78f));
-            whale.transform.rotation = Quaternion.Euler(0, 0, 90);
-            CreatePrimitive(PrimitiveType.Sphere, "Island Meadow", new Vector3(0, 0.1f, 0), new Vector3(7.8f, 1.25f, 5.4f), new Color(0.37f, 0.68f, 0.4f));
-            CreatePrimitive(PrimitiveType.Cylinder, "House Place", new Vector3(0.65f, 0.76f, 0.2f), new Vector3(2.2f, 0.16f, 2.2f), new Color(0.81f, 0.64f, 0.42f));
-            CreatePrimitive(PrimitiveType.Sphere, "Cloud One", new Vector3(-5, 4, 4), new Vector3(2.2f, 0.8f, 1.2f), Color.white);
-            CreatePrimitive(PrimitiveType.Sphere, "Cloud Two", new Vector3(5, 3, 5), new Vector3(1.8f, 0.65f, 1.1f), Color.white);
-            CreatePrimitive(PrimitiveType.Cylinder, "Tree", new Vector3(-2.1f, 1.35f, 0.3f), new Vector3(0.3f, 1.1f, 0.3f), new Color(0.36f, 0.21f, 0.1f));
-            CreatePrimitive(PrimitiveType.Sphere, "Tree Canopy", new Vector3(-2.1f, 2.3f, 0.3f), new Vector3(1.25f, 1.15f, 1.25f), new Color(0.22f, 0.5f, 0.28f));
-            foundation = CreatePrimitive(PrimitiveType.Cube, "House Foundation", new Vector3(0.65f, 1.03f, 0.2f), new Vector3(1.8f, 0.55f, 1.5f), new Color(0.7f, 0.51f, 0.36f));
+            CreateSkyWhale();
+            CreateIsland();
+            CreateCloud(new Vector3(-5f, 4f, 4f), 1.1f, "Cloud One");
+            CreateCloud(new Vector3(5f, 3f, 5f), 0.9f, "Cloud Two");
+            CreatePineTree(new Vector3(-2.1f, 0.75f, 0.3f), 1.05f);
+            CreatePineTree(new Vector3(2.6f, 0.7f, -0.75f), 0.7f);
+            foundation = CreateHouseFoundation(new Vector3(0.65f, 0.76f, 0.2f));
         }
 
         private void ApplyHouseStage()
@@ -101,9 +102,126 @@ namespace CloudWhale.Game.Presentation
         {
             var item = GameObject.CreatePrimitive(type);
             item.name = name; item.transform.position = position; item.transform.localScale = scale;
-            var material = new Material(Shader.Find("Standard")) { color = color };
-            item.GetComponent<Renderer>().material = material;
+            var renderer = item.GetComponent<Renderer>();
+            var material = LoadMaterialFor(name);
+            if (material != null)
+            {
+                // A serialized material keeps its shader in the Web build; a material created only at runtime can be stripped.
+                renderer.sharedMaterial = material;
+            }
+            else
+            {
+                renderer.material.color = color;
+            }
             return item;
+        }
+
+        private static Material LoadMaterialFor(string objectName)
+        {
+            var textureName = objectName.StartsWith("Whale ") && !objectName.Contains("Eye") && !objectName.Contains("Spout")
+                ? "whale-skin"
+                : objectName == "Island Meadow" || objectName == "Pine Foliage"
+                    ? "meadow"
+                    : objectName == "Island Soil"
+                        ? "island-soil"
+                        : objectName == "Tree Trunk" || objectName.StartsWith("Foundation ")
+                            ? "warm-wood"
+                            : null;
+
+            if (textureName == null) return null;
+            if (MaterialCache.TryGetValue(textureName, out var cached)) return cached;
+
+            var material = Resources.Load<Material>("Materials/" + textureName);
+            MaterialCache.Add(textureName, material);
+            return material;
+        }
+
+        private static GameObject CreateRoot(string name)
+        {
+            return new GameObject(name);
+        }
+
+        private void CreateSkyWhale()
+        {
+            var root = CreateRoot("Sleeping Sky Whale Model");
+            var blue = new Color(0.22f, 0.48f, 0.72f);
+            var belly = new Color(0.73f, 0.88f, 0.94f);
+            var fin = new Color(0.16f, 0.36f, 0.58f);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Body", new Vector3(0f, -1.55f, 0.4f), new Vector3(7.8f, 2.7f, 4.5f), blue), root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Belly", new Vector3(0.1f, -1.1f, 0.22f), new Vector3(6.9f, 1.5f, 3.6f), belly), root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Head", new Vector3(-3.35f, -1.3f, 0.42f), new Vector3(2.5f, 2.25f, 3.2f), blue), root);
+            var leftEye = CreatePrimitive(PrimitiveType.Sphere, "Whale Left Eye", new Vector3(-4.15f, -0.8f, -0.75f), new Vector3(0.23f, 0.23f, 0.23f), new Color(0.04f, 0.08f, 0.15f));
+            Parent(leftEye, root);
+            var rightEye = CreatePrimitive(PrimitiveType.Sphere, "Whale Right Eye", new Vector3(-4.15f, -0.8f, 1.58f), new Vector3(0.23f, 0.23f, 0.23f), new Color(0.04f, 0.08f, 0.15f));
+            Parent(rightEye, root);
+            var leftFin = CreatePrimitive(PrimitiveType.Sphere, "Whale Left Fin", new Vector3(0.45f, -1.35f, -2.1f), new Vector3(2.15f, 0.36f, 1.1f), fin);
+            leftFin.transform.rotation = Quaternion.Euler(15f, 10f, 22f); Parent(leftFin, root);
+            var rightFin = CreatePrimitive(PrimitiveType.Sphere, "Whale Right Fin", new Vector3(0.45f, -1.35f, 2.9f), new Vector3(2.15f, 0.36f, 1.1f), fin);
+            rightFin.transform.rotation = Quaternion.Euler(-15f, 10f, 22f); Parent(rightFin, root);
+            var tailLeft = CreatePrimitive(PrimitiveType.Sphere, "Whale Tail Left", new Vector3(4.05f, -1.45f, -0.85f), new Vector3(1.7f, 0.35f, 1.25f), fin);
+            tailLeft.transform.rotation = Quaternion.Euler(0f, 0f, 28f); Parent(tailLeft, root);
+            var tailRight = CreatePrimitive(PrimitiveType.Sphere, "Whale Tail Right", new Vector3(4.05f, -1.45f, 1.65f), new Vector3(1.7f, 0.35f, 1.25f), fin);
+            tailRight.transform.rotation = Quaternion.Euler(0f, 0f, -28f); Parent(tailRight, root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout", new Vector3(-2.5f, 0.2f, 0.4f), new Vector3(0.38f, 0.8f, 0.38f), Color.white), root);
+        }
+
+        private void CreateIsland()
+        {
+            var root = CreateRoot("Floating Island Model");
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Meadow", new Vector3(0f, 0.1f, 0f), new Vector3(7.8f, 1.25f, 5.4f), new Color(0.31f, 0.66f, 0.39f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Soil", new Vector3(0f, -0.35f, 0f), new Vector3(7.0f, 1.15f, 4.75f), new Color(0.45f, 0.28f, 0.16f)), root);
+            for (var i = 0; i < 7; i++)
+            {
+                var angle = i * Mathf.PI * 2f / 7f;
+                var rock = CreatePrimitive(PrimitiveType.Sphere, "Island Rock", new Vector3(Mathf.Cos(angle) * 3.3f, 0.23f, Mathf.Sin(angle) * 2.1f), new Vector3(0.55f, 0.36f, 0.48f), new Color(0.58f, 0.63f, 0.67f));
+                rock.transform.rotation = Quaternion.Euler(0f, i * 37f, 25f);
+                Parent(rock, root);
+            }
+        }
+
+        private void CreateCloud(Vector3 center, float scale, string name)
+        {
+            var root = CreateRoot(name + " Model");
+            Parent(CreatePrimitive(PrimitiveType.Sphere, name + " Base", center, new Vector3(2.8f, 0.75f, 1.25f) * scale, Color.white), root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, name + " Puff A", center + new Vector3(-0.7f, 0.42f, 0f) * scale, new Vector3(1.25f, 1.05f, 1f) * scale, Color.white), root);
+            Parent(CreatePrimitive(PrimitiveType.Sphere, name + " Puff B", center + new Vector3(0.35f, 0.58f, 0.05f) * scale, new Vector3(1.5f, 1.25f, 1.05f) * scale, Color.white), root);
+        }
+
+        private void CreatePineTree(Vector3 basePosition, float scale)
+        {
+            var root = CreateRoot("Soft Pine Tree Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Tree Trunk", basePosition + Vector3.up * (0.72f * scale), new Vector3(0.22f, 0.72f, 0.22f) * scale, new Color(0.32f, 0.18f, 0.09f)), root);
+            CreateFoliageTier(root, basePosition + Vector3.up * (1.22f * scale), 1.2f * scale, new Color(0.18f, 0.45f, 0.27f));
+            CreateFoliageTier(root, basePosition + Vector3.up * (1.72f * scale), 0.95f * scale, new Color(0.21f, 0.53f, 0.31f));
+            CreateFoliageTier(root, basePosition + Vector3.up * (2.15f * scale), 0.68f * scale, new Color(0.25f, 0.6f, 0.35f));
+        }
+
+        private static void CreateFoliageTier(GameObject root, Vector3 position, float radius, Color color)
+        {
+            var tier = CreatePrimitive(PrimitiveType.Sphere, "Pine Foliage", position, new Vector3(radius, radius * 0.62f, radius), color);
+            Parent(tier, root);
+        }
+
+        private GameObject CreateHouseFoundation(Vector3 center)
+        {
+            var root = CreateRoot("House Foundation Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "House Clearing", center, new Vector3(2.2f, 0.16f, 2.2f), new Color(0.8f, 0.63f, 0.39f)), root);
+            var wood = new Color(0.59f, 0.35f, 0.17f);
+            for (var row = -1; row <= 1; row++)
+            {
+                var plank = CreatePrimitive(PrimitiveType.Cube, "Foundation Plank", center + new Vector3(0f, 0.31f, row * 0.48f), new Vector3(1.95f, 0.16f, 0.37f), wood);
+                Parent(plank, root);
+            }
+            foreach (var offset in new[] { new Vector3(-0.8f, 0.5f, -0.56f), new Vector3(0.8f, 0.5f, -0.56f), new Vector3(-0.8f, 0.5f, 0.56f), new Vector3(0.8f, 0.5f, 0.56f) })
+            {
+                Parent(CreatePrimitive(PrimitiveType.Cylinder, "Foundation Post", center + offset, new Vector3(0.12f, 0.36f, 0.12f), new Color(0.39f, 0.22f, 0.1f)), root);
+            }
+            return root;
+        }
+
+        private static void Parent(GameObject child, GameObject root)
+        {
+            child.transform.SetParent(root.transform, true);
         }
 
         private void CreateStyles()

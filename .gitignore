@@ -12,6 +12,7 @@
 /[Bb]uild/
 /[Bb]uilds/
 /[Ll]ogs/
+/[Tt]estResults/
 /[Uu]ser[Ss]ettings/
 *.log
 

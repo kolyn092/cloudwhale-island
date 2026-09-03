@@ -1,0 +1,9 @@
+<linker>
+  <!-- GameObject.CreatePrimitive adds one of these colliders. Preserve them for the Web player even though gameplay does not query physics. -->
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.BoxCollider" preserve="all" />
+    <type fullname="UnityEngine.CapsuleCollider" preserve="all" />
+    <type fullname="UnityEngine.MeshCollider" preserve="all" />
+    <type fullname="UnityEngine.SphereCollider" preserve="all" />
+  </assembly>
+</linker>

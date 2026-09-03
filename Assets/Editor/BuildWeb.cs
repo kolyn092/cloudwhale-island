@@ -7,6 +7,7 @@ namespace CloudWhale.Editor
 {
     public static class BuildWeb
     {
+        [MenuItem("CloudWhale/Build Web #F9")]
         public static void Build()
         {
             var output = Environment.GetEnvironmentVariable("CLOUDWHALE_WEB_BUILD_PATH");
