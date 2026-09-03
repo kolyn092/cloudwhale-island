@@ -150,6 +150,29 @@ namespace CloudWhale.Tests
         }
 
         [Test]
+        public void SaveCurrentProgress_UpdatesTimestampOnlyAfterASuccessfulWrite()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            var lastSuccessfulTimestamp = SavedTimestamp(storage);
+
+            clock.UtcNow = clock.UtcNow.AddMinutes(5);
+            storage.FailWrites = true;
+            session.SaveCurrentProgress();
+
+            Assert.That(SavedTimestamp(storage), Is.EqualTo(lastSuccessfulTimestamp));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.StorageUnavailable));
+
+            storage.FailWrites = false;
+            session.SaveCurrentProgress();
+
+            Assert.That(SavedTimestamp(storage), Is.EqualTo(GameStateData.ToUnixSeconds(clock.UtcNow)));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.None));
+        }
+
+        [Test]
         public void Load_BackwardClock_GrantsNothing_AndMovesSavedTimestampToNow()
         {
             var storage = new InMemoryStorage();
@@ -232,6 +255,58 @@ namespace CloudWhale.Tests
             {
                 UnityEngine.Object.DestroyImmediate(gameObject);
             }
+        }
+
+        [Test]
+        public void RuntimeLifecycle_InactiveAndQuitRetrySaving_WithoutChangingProgress()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var gameObject = new GameObject("production-runtime-lifecycle-test");
+            try
+            {
+                var runtime = gameObject.AddComponent<OpenGameProductionRuntime>();
+                runtime.Initialize(storage, clock, new ProductionSettings(60, 1, new HouseFoundationCost(1, 1, 1, 1)));
+                runtime.Session.AddResources(new ResourceAmounts(1, 1, 1, 1));
+                Assert.That(runtime.Session.TryBuildHouseFoundation(), Is.True);
+                var stateBeforeSaving = runtime.Session.State;
+                var writesBeforeSaving = storage.WriteCount;
+
+                clock.UtcNow = clock.UtcNow.AddMinutes(1);
+                InvokeRuntimeSignal(runtime, "OnApplicationPause", true);
+                Assert.That(SavedTimestamp(storage), Is.EqualTo(GameStateData.ToUnixSeconds(clock.UtcNow)));
+
+                InvokeRuntimeSignal(runtime, "OnApplicationFocus", true);
+                Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeSaving + 1));
+
+                clock.UtcNow = clock.UtcNow.AddMinutes(1);
+                InvokeRuntimeSignal(runtime, "OnApplicationFocus", false);
+                clock.UtcNow = clock.UtcNow.AddMinutes(1);
+                InvokeRuntimeSignal(runtime, "OnApplicationQuit");
+
+                Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeSaving + 3));
+                Assert.That(runtime.Session.State.Resources, Is.EqualTo(stateBeforeSaving.Resources));
+                Assert.That(runtime.Session.State.HouseStage, Is.EqualTo(stateBeforeSaving.HouseStage));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        private static long SavedTimestamp(InMemoryStorage storage)
+        {
+            Assert.That(GameStateSerializer.TryDeserialize(storage.Value, out var saved), Is.True);
+            return saved.savedAtUnixSeconds;
+        }
+
+        private static void InvokeRuntimeSignal(OpenGameProductionRuntime runtime, string methodName, params object[] arguments)
+        {
+            var method = typeof(OpenGameProductionRuntime).GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(runtime, arguments);
         }
 
         private sealed class ManualClock : IClock
