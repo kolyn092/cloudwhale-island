@@ -4,7 +4,7 @@
 
 - 검증 대상은 `docs/t1-verify-first-slice` 브랜치의 Web 생산 빌드와 실행 화면이다.
 - 기대값은 열린 게임에서 60초마다 유목·구름솜·이슬·별가루가 각각 1개씩 증가하고, 집 기초는 각각 5개를 한 번만 소비하는 것이다.
-- 기존 브라우저 저장소는 읽기·수정·삭제하지 않았다. `http://127.0.0.1:41874`라는 이번 실행 전용 원점에서 새 저장으로 시작했다. 브라우저 자동화 표면은 별도의 프로필 경로를 지정하거나 삭제하는 기능을 제공하지 않아, 프로필 전체 삭제 성공은 확인하지 못했다. 따라서 이 항목은 통과로 판정하지 않는다.
+- 기존 사용자 Chrome 프로필과 저장소는 읽기·수정·삭제하지 않았다. 초기 확인은 `http://127.0.0.1:41874` 전용 원점에서 수행했다. 이후 보완 확인에는 명시적 임시 Chrome 프로필을 사용했다.
 
 ## 자동 검사
 
@@ -45,6 +45,18 @@
 
 - Unity Editor를 비배치 모드로 열어 대상 프로젝트 창(`T1 - Untitled - Web - Unity 6.3 LTS (6000.3.23f1)`)이 열리는 것까지 확인했다.
 - 이 환경에서는 Editor의 Play 모드 상호작용과 화면 캡처를 신뢰성 있게 수집할 수 없었다. 따라서 Editor 직접 게임 흐름은 미확인으로 남기고, 위 Web 직접 확인 및 EditMode 자동 검사로 대체 통과라고 쓰지 않는다.
+
+## 임시 Chrome 프로필 보완 확인
+
+- 프로필 경로 `C:\Users\kosuk\AppData\Local\Temp\cloudwhale-t1-browser-profile-20260903`를 새로 만들고, 아래 명령으로 기존 사용자 Chrome과 분리해 `http://127.0.0.1:41875/`를 열었다.
+
+```powershell
+& 'C:\Program Files\Google\Chrome\Application\chrome.exe' "--user-data-dir=C:\Users\kosuk\AppData\Local\Temp\cloudwhale-t1-browser-profile-20260903" '--no-first-run' '--no-default-browser-check' '--new-window' 'http://127.0.0.1:41875/'
+```
+
+- 실행 직후 새 Chrome 프로세스의 명령줄에 위 `--user-data-dir` 경로가 포함된 것을 확인했고, 창 제목 `Unity Web Player | CloudWhale Island - Chrome`도 확인했다.
+- 해당 창의 화면 캡처를 수집하려 했지만 Windows UI 자동화가 현재 Chrome URL을 정책상 충분히 판별하지 못해 즉시 중단됐다. 따라서 임시 프로필 Chrome에서의 화면 증거는 수집하지 못했으며, 이전 절의 화면 증거로 대체 통과라고 쓰지 않는다.
+- 임시 프로필 Chrome 프로세스(50144, 44092)를 종료한 뒤 프로필 디렉터리 전체를 삭제했다. 삭제 뒤 경로 존재 확인 결과는 `false`였다. 로컬 정적 서버도 종료했다.
 
 ## 정적 서버 관찰
 
