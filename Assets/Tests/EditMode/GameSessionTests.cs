@@ -200,6 +200,27 @@ namespace CloudWhale.Tests
         }
 
         [Test]
+        public void OpenGameProductionController_ReportsWholeSecondsUntilTheNextCycle()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            var controller = new OpenGameProductionController(session, clock);
+
+            Assert.That(controller.SecondsUntilNextProduction, Is.EqualTo(60));
+
+            clock.UtcNow = clock.UtcNow.AddMilliseconds(200);
+            Assert.That(controller.SecondsUntilNextProduction, Is.EqualTo(60));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(59);
+            Assert.That(controller.SecondsUntilNextProduction, Is.EqualTo(1));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(1);
+            Assert.That(controller.SecondsUntilNextProduction, Is.EqualTo(0));
+        }
+
+        [Test]
         public void BrowserStorage_ReadFailure_IsNotTreatedAsAnAbsentKey()
         {
             var browserStorage = new BrowserLocalStorage("state", new FailingBrowserBridge());
