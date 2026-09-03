@@ -39,6 +39,21 @@ namespace CloudWhale.Game
             controller?.Tick();
         }
 
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (pauseStatus) session?.SaveCurrentProgress();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus) session?.SaveCurrentProgress();
+        }
+
+        private void OnApplicationQuit()
+        {
+            session?.SaveCurrentProgress();
+        }
+
         private void OnDestroy()
         {
             if (instance == this) instance = null;

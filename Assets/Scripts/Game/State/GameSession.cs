@@ -157,6 +157,14 @@ namespace CloudWhale.Game
             return true;
         }
 
+        // Called by the runtime when the game becomes inactive or is closing. This retries persistence
+        // without changing resources, house progress, or any other gameplay state.
+        public void SaveCurrentProgress()
+        {
+            EnsureLoaded();
+            Persist(clock.UtcNow);
+        }
+
         private int GrantCompletedIntervals(long elapsedSeconds)
         {
             var intervals = elapsedSeconds / production.IntervalSeconds;
@@ -171,9 +179,11 @@ namespace CloudWhale.Game
 
         private void Persist(DateTime now, bool preserveReason = false)
         {
+            var lastSuccessfulSavedAt = data.savedAtUnixSeconds;
             data.savedAtUnixSeconds = GameStateData.ToUnixSeconds(now);
             if (!storage.TryWrite(GameStateSerializer.Serialize(data), out _))
             {
+                data.savedAtUnixSeconds = lastSuccessfulSavedAt;
                 LastReason = GameReason.StorageUnavailable;
             }
             else if (!preserveReason)
