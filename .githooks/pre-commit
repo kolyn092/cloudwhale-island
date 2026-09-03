@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+
+set -eu
+
+branch="$(git symbolic-ref --quiet --short HEAD || true)"
+
+if [ -z "$branch" ]; then
+  echo "커밋을 중단했습니다: 분리된 HEAD에서는 커밋할 수 없습니다." >&2
+  exit 1
+fi
+
+if printf '%s\n' "$branch" | grep -Eq '^(feat|fix|docs|refactor|test|chore|build|ci|perf|style|hotfix)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+  exit 0
+fi
+
+cat >&2 <<'EOF'
+커밋을 중단했습니다: 작업 브랜치 이름이 규칙에 맞지 않습니다.
+
+허용 형식: 타입/기능명
+예시: feat/offline-rewards, fix/save-recovery, docs/build-guide
+허용 타입: feat, fix, docs, refactor, test, chore, build, ci, perf, style, hotfix
+
+main에 직접 커밋하지 말고, 올바른 기능 브랜치를 만든 뒤 PR로 병합하세요.
+EOF
+exit 1
