@@ -5,13 +5,13 @@ set -eu
 message_file="$1"
 message="$(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$message_file")"
 
-if printf '%s\n' "$message" | grep -q '[가-힣]'; then
+if printf '%s\n' "$message" | grep -Eq '^(feat|fix|docs|refactor|test|chore|build|ci|perf|style|hotfix): .*[가-힣]'; then
   exit 0
 fi
 
 cat >&2 <<'EOF'
-커밋을 중단했습니다: 커밋 메시지는 한국어로 작성해야 합니다.
+커밋을 중단했습니다: 커밋 메시지는 영어 타입과 한국어 설명을 사용해야 합니다.
 
-예시: 브랜치 커밋 규칙을 적용한다
+예시: feat: 오프라인 보상을 추가한다
 EOF
 exit 1
