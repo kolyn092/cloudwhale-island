@@ -14,6 +14,10 @@ namespace CloudWhale.Game.Presentation
         private GameObject foundation;
         private GameObject framing;
         private GameObject completedHouse;
+        private GameObject lockedGarden;
+        private GameObject gardenFoundation;
+        private GameObject gardenFraming;
+        private GameObject completedGarden;
         private GUIStyle panelStyle;
         private GUIStyle textStyle;
         private GUIStyle buttonStyle;
@@ -39,6 +43,7 @@ namespace CloudWhale.Game.Presentation
             presentation = new IslandPresentationController(productionRuntime.Session, productionRuntime.Session.HouseFoundationCost);
             CreateDiorama();
             ApplyHouseStage();
+            ApplyGardenStage();
         }
 
         private void Update()
@@ -46,6 +51,7 @@ namespace CloudWhale.Game.Presentation
             if (presentation == null) return;
             presentation.Refresh();
             ApplyHouseStage();
+            ApplyGardenStage();
         }
 
         private void OnGUI()
@@ -53,18 +59,27 @@ namespace CloudWhale.Game.Presentation
             if (presentation == null) return;
             if (panelStyle == null) CreateStyles();
             var view = presentation.View;
-            GUI.Box(new Rect(20, 20, 410, 252), GUIContent.none, panelStyle);
+            GUI.Box(new Rect(20, 20, 410, 338), GUIContent.none, panelStyle);
             GUI.Label(new Rect(38, 34, 370, 28), "Cloudwhale Island", textStyle);
             GUI.Label(new Rect(38, 70, 360, 92), ResourceText(view.Resources), textStyle);
             GUI.Label(new Rect(38, 166, 360, 26), "House: " + HouseStageText(view.HouseAppearance), textStyle);
             GUI.Label(new Rect(38, 192, 360, 42), view.NextAction, textStyle);
+            GUI.Label(new Rect(38, 238, 360, 26), "Garden: " + GardenStageText(view.GardenAppearance), textStyle);
+            GUI.Label(new Rect(38, 264, 360, 42), view.GardenNextAction, textStyle);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            GUI.Label(new Rect(450, 20, 280, 28), "DEV · +1 each in " + productionRuntime.SecondsUntilNextProduction + "s", textStyle);
+            GUI.Label(new Rect(450, 20, 350, 46), ProductionText(view.GardenAppearance) + " in " + productionRuntime.SecondsUntilNextProduction + "s", textStyle);
 #endif
-            if (view.CanBuildNextHouseStage && GUI.Button(new Rect(38, 238, 190, 38), "Build next house stage", buttonStyle))
+            if (view.CanBuildNextHouseStage && GUI.Button(new Rect(38, 310, 175, 38), "Build next house stage", buttonStyle))
             {
                 presentation.BuildNextHouseStage();
                 ApplyHouseStage();
+                ApplyGardenStage();
+            }
+
+            if (view.CanBuildNextGardenStage && GUI.Button(new Rect(223, 310, 175, 38), "Build next garden stage", buttonStyle))
+            {
+                presentation.BuildNextGardenStage();
+                ApplyGardenStage();
             }
 
             GUI.Box(new Rect(20, Screen.height - 62, 560, 42), view.StatusMessage, panelStyle);
@@ -82,6 +97,24 @@ namespace CloudWhale.Game.Presentation
                 case IslandHouseAppearance.Complete: return "Complete";
                 default: return "Unbuilt";
             }
+        }
+
+        private static string GardenStageText(IslandGardenAppearance appearance)
+        {
+            switch (appearance)
+            {
+                case IslandGardenAppearance.Foundation: return "Foundation";
+                case IslandGardenAppearance.Framing: return "Framing";
+                case IslandGardenAppearance.Complete: return "Complete";
+                default: return "Locked vacant lot";
+            }
+        }
+
+        private static string ProductionText(IslandGardenAppearance appearance)
+        {
+            return appearance == IslandGardenAppearance.Complete
+                ? "DEV · Driftwood +1 · Cloud Cotton +2 · Dew +2 · Stardust +1"
+                : "DEV · +1 each";
         }
 
         private void CreateDiorama()
@@ -110,6 +143,11 @@ namespace CloudWhale.Game.Presentation
             foundation = CreateHouseFoundation(new Vector3(0.65f, 0.76f, 0.2f));
             framing = CreateHouseFraming(new Vector3(0.65f, 0.76f, 0.2f));
             completedHouse = CreateCompletedHouse(new Vector3(0.65f, 0.76f, 0.2f));
+            var gardenCenter = new Vector3(-0.7f, 0.76f, 2.1f);
+            lockedGarden = CreateLockedGarden(gardenCenter);
+            gardenFoundation = CreateGardenFoundation(gardenCenter);
+            gardenFraming = CreateGardenFraming(gardenCenter);
+            completedGarden = CreateCompletedGarden(gardenCenter);
         }
 
         private void ApplyHouseStage()
@@ -119,6 +157,16 @@ namespace CloudWhale.Game.Presentation
             if (foundation != null) foundation.SetActive(appearance == IslandHouseAppearance.Foundation);
             if (framing != null) framing.SetActive(appearance == IslandHouseAppearance.Framing);
             if (completedHouse != null) completedHouse.SetActive(appearance == IslandHouseAppearance.Complete);
+        }
+
+        private void ApplyGardenStage()
+        {
+            if (presentation == null) return;
+            var appearance = presentation.View.GardenAppearance;
+            if (lockedGarden != null) lockedGarden.SetActive(appearance == IslandGardenAppearance.Locked);
+            if (gardenFoundation != null) gardenFoundation.SetActive(appearance == IslandGardenAppearance.Foundation);
+            if (gardenFraming != null) gardenFraming.SetActive(appearance == IslandGardenAppearance.Framing);
+            if (completedGarden != null) completedGarden.SetActive(appearance == IslandGardenAppearance.Complete);
         }
 
         private static GameObject CreatePrimitive(PrimitiveType type, string name, Vector3 position, Vector3 scale, Color color)
@@ -223,6 +271,51 @@ namespace CloudWhale.Game.Presentation
         {
             var tier = CreatePrimitive(PrimitiveType.Sphere, "Pine Foliage", position, new Vector3(radius, radius * 0.62f, radius), color);
             Parent(tier, root);
+        }
+
+        private GameObject CreateLockedGarden(Vector3 center)
+        {
+            var root = CreateRoot("Garden Locked Vacant Lot Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Locked Clearing", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.55f, 0.4f, 0.22f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Locked Sign Post", center + new Vector3(-0.72f, 0.5f, 0f), new Vector3(0.08f, 0.48f, 0.08f), new Color(0.36f, 0.2f, 0.09f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Sign", center + new Vector3(-0.72f, 0.88f, 0f), new Vector3(0.62f, 0.32f, 0.08f), new Color(0.68f, 0.47f, 0.2f)), root);
+            return root;
+        }
+
+        private GameObject CreateGardenFoundation(Vector3 center)
+        {
+            var root = CreateRoot("Garden Foundation Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Foundation Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
+            foreach (var offset in new[] { -0.55f, 0.55f })
+            {
+                Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Bed", center + new Vector3(offset, 0.18f, 0f), new Vector3(0.72f, 0.13f, 1.65f), new Color(0.63f, 0.36f, 0.16f)), root);
+            }
+            return root;
+        }
+
+        private GameObject CreateGardenFraming(Vector3 center)
+        {
+            var root = CreateRoot("Garden Framing Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Framing Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
+            foreach (var offset in new[] { new Vector3(-0.82f, 0.75f, -0.62f), new Vector3(0.82f, 0.75f, -0.62f), new Vector3(-0.82f, 0.75f, 0.62f), new Vector3(0.82f, 0.75f, 0.62f) })
+            {
+                Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Framing Post", center + offset, new Vector3(0.08f, 0.7f, 0.08f), new Color(0.39f, 0.22f, 0.1f)), root);
+            }
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Framing Beam", center + new Vector3(0f, 1.35f, -0.62f), new Vector3(1.78f, 0.1f, 0.1f), new Color(0.39f, 0.22f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Framing Back Beam", center + new Vector3(0f, 1.35f, 0.62f), new Vector3(1.78f, 0.1f, 0.1f), new Color(0.39f, 0.22f, 0.1f)), root);
+            return root;
+        }
+
+        private GameObject CreateCompletedGarden(Vector3 center)
+        {
+            var root = CreateRoot("Completed Garden Model");
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Completed Garden Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
+            foreach (var offset in new[] { new Vector3(-0.56f, 0.34f, -0.45f), new Vector3(0.5f, 0.34f, -0.32f), new Vector3(-0.25f, 0.34f, 0.5f), new Vector3(0.7f, 0.34f, 0.55f) })
+            {
+                Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Bloom", center + offset, new Vector3(0.48f, 0.55f, 0.48f), new Color(0.36f, 0.72f, 0.3f)), root);
+                Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Flower", center + offset + Vector3.up * 0.3f, new Vector3(0.18f, 0.18f, 0.18f), new Color(0.98f, 0.68f, 0.36f)), root);
+            }
+            return root;
         }
 
         private GameObject CreateHouseFoundation(Vector3 center)

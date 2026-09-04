@@ -33,6 +33,13 @@ namespace CloudWhale.Game.Presentation
             View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
         }
 
+        public void BuildNextGardenStage()
+        {
+            session.TryBuildNextGardenStage();
+            var state = session.State;
+            View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
+        }
+
         private IslandPresentationView CreateView(GameStateSnapshot state, string statusMessage)
         {
             return new IslandPresentationView(
@@ -41,6 +48,10 @@ namespace CloudWhale.Game.Presentation
                 AppearanceFor(state.HouseStage),
                 state.HouseStage != HouseStage.Complete,
                 NextAction(state.HouseStage),
+                state.GardenStage,
+                GardenAppearanceFor(state.GardenStage),
+                state.HouseStage == HouseStage.Complete && state.GardenStage != GardenStage.Complete,
+                GardenNextAction(state),
                 statusMessage);
         }
 
@@ -66,9 +77,42 @@ namespace CloudWhale.Game.Presentation
             }
         }
 
+        private static IslandGardenAppearance GardenAppearanceFor(GardenStage stage)
+        {
+            switch (stage)
+            {
+                case GardenStage.Foundation: return IslandGardenAppearance.Foundation;
+                case GardenStage.Framing: return IslandGardenAppearance.Framing;
+                case GardenStage.Complete: return IslandGardenAppearance.Complete;
+                default: return IslandGardenAppearance.Locked;
+            }
+        }
+
+        private string GardenNextAction(GameStateSnapshot state)
+        {
+            if (state.HouseStage != HouseStage.Complete)
+            {
+                return "Garden locked — complete the house first.";
+            }
+
+            switch (state.GardenStage)
+            {
+                case GardenStage.Foundation: return "Next: build the garden framing (" + GardenCostText() + ").";
+                case GardenStage.Framing: return "Next: complete the garden (" + GardenCostText() + ").";
+                case GardenStage.Complete: return "Garden complete — Cloud Cotton and Dew now grow faster.";
+                default: return "Next: build the garden foundation (" + GardenCostText() + ").";
+            }
+        }
+
         private string CostText()
         {
             var cost = stageCost.Resources;
+            return $"Driftwood {cost.Driftwood}, Cloud Cotton {cost.CloudCotton}, Dew {cost.Dew}, Stardust {cost.Stardust}";
+        }
+
+        private string GardenCostText()
+        {
+            var cost = session.GardenStageCost.Resources;
             return $"Driftwood {cost.Driftwood}, Cloud Cotton {cost.CloudCotton}, Dew {cost.Dew}, Stardust {cost.Stardust}";
         }
 
@@ -81,12 +125,14 @@ namespace CloudWhale.Game.Presentation
             }
 
             if (reason == GameReason.HouseAlreadyComplete) return "The house is already complete and resting safely on the island.";
+            if (reason == GameReason.HouseMustBeComplete) return "Garden locked — complete the house first.";
+            if (reason == GameReason.GardenAlreadyComplete) return "The garden is already complete and blooming safely on the island.";
             return SaveMessage(reason);
         }
 
         private string StatusMessage(GameReason reason, ResourceAmounts resources)
         {
-            if (reason == GameReason.InsufficientResources || reason == GameReason.HouseAlreadyComplete)
+            if (reason == GameReason.InsufficientResources || reason == GameReason.HouseAlreadyComplete || reason == GameReason.HouseMustBeComplete || reason == GameReason.GardenAlreadyComplete)
             {
                 return FailureMessage(reason, resources);
             }
@@ -123,15 +169,27 @@ namespace CloudWhale.Game.Presentation
         Complete,
     }
 
+    public enum IslandGardenAppearance
+    {
+        Locked,
+        Foundation,
+        Framing,
+        Complete,
+    }
+
     public readonly struct IslandPresentationView
     {
-        public IslandPresentationView(ResourceAmounts resources, HouseStage houseStage, IslandHouseAppearance houseAppearance, bool canBuildNextHouseStage, string nextAction, string statusMessage)
+        public IslandPresentationView(ResourceAmounts resources, HouseStage houseStage, IslandHouseAppearance houseAppearance, bool canBuildNextHouseStage, string nextAction, GardenStage gardenStage, IslandGardenAppearance gardenAppearance, bool canBuildNextGardenStage, string gardenNextAction, string statusMessage)
         {
             Resources = resources;
             HouseStage = houseStage;
             HouseAppearance = houseAppearance;
             CanBuildNextHouseStage = canBuildNextHouseStage;
             NextAction = nextAction;
+            GardenStage = gardenStage;
+            GardenAppearance = gardenAppearance;
+            CanBuildNextGardenStage = canBuildNextGardenStage;
+            GardenNextAction = gardenNextAction;
             StatusMessage = statusMessage;
         }
 
@@ -140,6 +198,10 @@ namespace CloudWhale.Game.Presentation
         public IslandHouseAppearance HouseAppearance { get; }
         public bool CanBuildNextHouseStage { get; }
         public string NextAction { get; }
+        public GardenStage GardenStage { get; }
+        public IslandGardenAppearance GardenAppearance { get; }
+        public bool CanBuildNextGardenStage { get; }
+        public string GardenNextAction { get; }
         public string StatusMessage { get; }
     }
 }
