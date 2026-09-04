@@ -9,12 +9,12 @@ namespace CloudWhale.Game.Presentation
     public sealed class IslandPresentationController
     {
         private readonly GameSession session;
-        private readonly HouseFoundationCost foundationCost;
+        private readonly HouseFoundationCost stageCost;
 
-        public IslandPresentationController(GameSession session, HouseFoundationCost foundationCost)
+        public IslandPresentationController(GameSession session, HouseFoundationCost stageCost)
         {
             this.session = session ?? throw new ArgumentNullException(nameof(session));
-            this.foundationCost = foundationCost;
+            this.stageCost = stageCost;
             Refresh();
         }
 
@@ -23,25 +23,52 @@ namespace CloudWhale.Game.Presentation
         public void Refresh()
         {
             var state = session.State;
-            View = new IslandPresentationView(state.Resources, state.HouseStage, NextAction(state.HouseStage), SaveMessage(session.LastReason));
+            View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
         }
 
-        public void BuildFoundation()
+        public void BuildNextHouseStage()
         {
-            // This is deliberately the only build call: cost checking, persistence, and stage mutation remain in T2.
-            var built = session.TryBuildHouseFoundation();
+            session.TryBuildNextHouseStage();
             var state = session.State;
-            var message = built ? SaveMessage(session.LastReason) : FailureMessage(session.LastReason, state.Resources);
-            View = new IslandPresentationView(state.Resources, state.HouseStage, NextAction(state.HouseStage), message);
+            View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
         }
 
-        private string NextAction(HouseStage stage) => stage == HouseStage.Foundation
-            ? "House foundation complete — enjoy your calm island."
-            : "Next: build the house foundation (" + CostText() + ").";
+        private IslandPresentationView CreateView(GameStateSnapshot state, string statusMessage)
+        {
+            return new IslandPresentationView(
+                state.Resources,
+                state.HouseStage,
+                AppearanceFor(state.HouseStage),
+                state.HouseStage != HouseStage.Complete,
+                NextAction(state.HouseStage),
+                statusMessage);
+        }
+
+        private static IslandHouseAppearance AppearanceFor(HouseStage stage)
+        {
+            switch (stage)
+            {
+                case HouseStage.Foundation: return IslandHouseAppearance.Foundation;
+                case HouseStage.Framing: return IslandHouseAppearance.Framing;
+                case HouseStage.Complete: return IslandHouseAppearance.Complete;
+                default: return IslandHouseAppearance.Unbuilt;
+            }
+        }
+
+        private string NextAction(HouseStage stage)
+        {
+            switch (stage)
+            {
+                case HouseStage.Foundation: return "Next: build the house framing (" + CostText() + ").";
+                case HouseStage.Framing: return "Next: complete the house (" + CostText() + ").";
+                case HouseStage.Complete: return "House complete — enjoy your calm island.";
+                default: return "Next: build the house foundation (" + CostText() + ").";
+            }
+        }
 
         private string CostText()
         {
-            var cost = foundationCost.Resources;
+            var cost = stageCost.Resources;
             return $"Driftwood {cost.Driftwood}, Cloud Cotton {cost.CloudCotton}, Dew {cost.Dew}, Stardust {cost.Stardust}";
         }
 
@@ -53,13 +80,23 @@ namespace CloudWhale.Game.Presentation
                 return "Not enough resources yet. Needed: " + string.Join(", ", missing) + ". Nothing was spent — there is no penalty.";
             }
 
-            if (reason == GameReason.HouseAlreadyHasFoundation) return "The house foundation is already resting safely on the island.";
+            if (reason == GameReason.HouseAlreadyComplete) return "The house is already complete and resting safely on the island.";
+            return SaveMessage(reason);
+        }
+
+        private string StatusMessage(GameReason reason, ResourceAmounts resources)
+        {
+            if (reason == GameReason.InsufficientResources || reason == GameReason.HouseAlreadyComplete)
+            {
+                return FailureMessage(reason, resources);
+            }
+
             return SaveMessage(reason);
         }
 
         private IEnumerable<string> MissingResources(ResourceAmounts resources)
         {
-            var cost = foundationCost.Resources;
+            var cost = stageCost.Resources;
             if (resources.Driftwood < cost.Driftwood) yield return "Driftwood " + (cost.Driftwood - resources.Driftwood);
             if (resources.CloudCotton < cost.CloudCotton) yield return "Cloud Cotton " + (cost.CloudCotton - resources.CloudCotton);
             if (resources.Dew < cost.Dew) yield return "Dew " + (cost.Dew - resources.Dew);
@@ -78,18 +115,30 @@ namespace CloudWhale.Game.Presentation
         }
     }
 
+    public enum IslandHouseAppearance
+    {
+        Unbuilt,
+        Foundation,
+        Framing,
+        Complete,
+    }
+
     public readonly struct IslandPresentationView
     {
-        public IslandPresentationView(ResourceAmounts resources, HouseStage houseStage, string nextAction, string statusMessage)
+        public IslandPresentationView(ResourceAmounts resources, HouseStage houseStage, IslandHouseAppearance houseAppearance, bool canBuildNextHouseStage, string nextAction, string statusMessage)
         {
             Resources = resources;
             HouseStage = houseStage;
+            HouseAppearance = houseAppearance;
+            CanBuildNextHouseStage = canBuildNextHouseStage;
             NextAction = nextAction;
             StatusMessage = statusMessage;
         }
 
         public ResourceAmounts Resources { get; }
         public HouseStage HouseStage { get; }
+        public IslandHouseAppearance HouseAppearance { get; }
+        public bool CanBuildNextHouseStage { get; }
         public string NextAction { get; }
         public string StatusMessage { get; }
     }

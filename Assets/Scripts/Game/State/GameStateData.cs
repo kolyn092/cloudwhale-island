@@ -6,6 +6,8 @@ namespace CloudWhale.Game
     {
         Unbuilt = 0,
         Foundation = 1,
+        Framing = 2,
+        Complete = 3,
     }
 
     public enum GameReason
@@ -13,6 +15,7 @@ namespace CloudWhale.Game
         None = 0,
         InsufficientResources,
         HouseAlreadyHasFoundation,
+        HouseAlreadyComplete,
         RecoveredInvalidSave,
         ClockMovedBackward,
         StorageUnavailable,

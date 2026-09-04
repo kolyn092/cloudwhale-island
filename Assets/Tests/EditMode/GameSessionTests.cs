@@ -84,6 +84,104 @@ namespace CloudWhale.Tests
             Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(1, 1, 1, 1)));
         }
 
+        [Test]
+        public void BuildNextHouseStage_AdvancesFoundationFramingAndCompletion_WithFiveOfEveryResourcePerStage()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(15, 15, 15, 15));
+            var writesAfterResources = storage.WriteCount;
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(1);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Foundation));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(10, 10, 10, 10)));
+            Assert.That(SavedTimestamp(storage), Is.EqualTo(GameStateData.ToUnixSeconds(clock.UtcNow)));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(1);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Framing));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(5, 5, 5, 5)));
+            Assert.That(SavedTimestamp(storage), Is.EqualTo(GameStateData.ToUnixSeconds(clock.UtcNow)));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(1);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Complete));
+            Assert.That(session.State.Resources, Is.EqualTo(ResourceAmounts.Zero));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesAfterResources + 3));
+            Assert.That(GameStateSerializer.TryDeserialize(storage.Value, out var saved), Is.True);
+            Assert.That(saved.houseStage, Is.EqualTo((int)HouseStage.Complete));
+            Assert.That(saved.savedAtUnixSeconds, Is.EqualTo(GameStateData.ToUnixSeconds(clock.UtcNow)));
+        }
+
+        [Test]
+        public void BuildNextHouseStage_LeavesResourcesStageAndSaveUnchanged_WhenAnyMaterialIsInsufficient()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(5, 5, 5, 5));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            session.AddResources(new ResourceAmounts(5, 5, 4, 5));
+            var savedBeforeRejectedBuild = storage.Value;
+            var writesBeforeRejectedBuild = storage.WriteCount;
+
+            Assert.That(session.TryBuildNextHouseStage(), Is.False);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Foundation));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(5, 5, 4, 5)));
+            Assert.That(storage.Value, Is.EqualTo(savedBeforeRejectedBuild));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeRejectedBuild));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.InsufficientResources));
+        }
+
+        [Test]
+        public void BuildNextHouseStage_RejectsCompletedHouseWithoutChangingStateOrSave()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(15, 15, 15, 15));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            var completedState = session.State;
+            var savedBeforeRetry = storage.Value;
+            var writesBeforeRetry = storage.WriteCount;
+
+            Assert.That(session.TryBuildNextHouseStage(), Is.False);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Complete));
+            Assert.That(session.State.Resources, Is.EqualTo(completedState.Resources));
+            Assert.That(storage.Value, Is.EqualTo(savedBeforeRetry));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeRetry));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.HouseAlreadyComplete));
+        }
+
+        [Test]
+        public void Load_LegacyFoundationSave_RemainsValidAndCanAdvanceToFraming()
+        {
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var legacyFoundationSave = GameStateData.Fresh(clock.UtcNow);
+            legacyFoundationSave.houseStage = (int)HouseStage.Foundation;
+            legacyFoundationSave.driftwood = 5;
+            legacyFoundationSave.cloudCotton = 5;
+            legacyFoundationSave.dew = 5;
+            legacyFoundationSave.stardust = 5;
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(legacyFoundationSave) };
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.None));
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Foundation));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Framing));
+            Assert.That(session.State.Resources, Is.EqualTo(ResourceAmounts.Zero));
+        }
+
         [TestCase("{not-json}")]
         [TestCase("{\"version\":1,\"savedAtUnixSeconds\":1,\"driftwood\":-1,\"cloudCotton\":0,\"dew\":0,\"stardust\":0,\"houseStage\":0}")]
         [TestCase("{\"version\":1,\"savedAtUnixSeconds\":1,\"driftwood\":0,\"cloudCotton\":0,\"dew\":0,\"stardust\":0,\"houseStage\":99}")]
