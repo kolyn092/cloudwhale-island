@@ -23,15 +23,14 @@ namespace CloudWhale.Game.Presentation
         public void Refresh()
         {
             var state = session.State;
-            View = CreateView(state, SaveMessage(session.LastReason));
+            View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
         }
 
         public void BuildNextHouseStage()
         {
-            var built = session.TryBuildNextHouseStage();
+            session.TryBuildNextHouseStage();
             var state = session.State;
-            var message = built ? SaveMessage(session.LastReason) : FailureMessage(session.LastReason, state.Resources);
-            View = CreateView(state, message);
+            View = CreateView(state, StatusMessage(session.LastReason, state.Resources));
         }
 
         private IslandPresentationView CreateView(GameStateSnapshot state, string statusMessage)
@@ -82,6 +81,16 @@ namespace CloudWhale.Game.Presentation
             }
 
             if (reason == GameReason.HouseAlreadyComplete) return "The house is already complete and resting safely on the island.";
+            return SaveMessage(reason);
+        }
+
+        private string StatusMessage(GameReason reason, ResourceAmounts resources)
+        {
+            if (reason == GameReason.InsufficientResources || reason == GameReason.HouseAlreadyComplete)
+            {
+                return FailureMessage(reason, resources);
+            }
+
             return SaveMessage(reason);
         }
 
