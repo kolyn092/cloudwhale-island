@@ -24,7 +24,7 @@ namespace CloudWhale.Tests
         }
 
         [Test]
-        public void Build_RefusesWithoutMutatingAndNamesEveryMissingResource_WhenResourcesAreShort()
+        public void Build_RefusesWithoutMutatingAndKeepsEveryMissingResourceMessageAfterRefresh_WhenResourcesAreShort()
         {
             var cost = new HouseFoundationCost(2, 3, 4, 5);
             var session = CreateSession(cost);
@@ -33,6 +33,7 @@ namespace CloudWhale.Tests
             var before = session.State;
 
             presentation.BuildNextHouseStage();
+            presentation.Refresh();
 
             Assert.That(presentation.View.HouseStage, Is.EqualTo(HouseStage.Unbuilt));
             Assert.That(session.State.Resources, Is.EqualTo(before.Resources));
@@ -81,7 +82,7 @@ namespace CloudWhale.Tests
         }
 
         [Test]
-        public void BuildNextStage_ExplainsCompletedHouseRejectionWithoutChangingItsAppearance()
+        public void BuildNextStage_KeepsCompletedHouseRejectionMessageAfterRefresh_WithoutChangingItsAppearance()
         {
             var cost = new HouseFoundationCost(5, 5, 5, 5);
             var session = CreateSession(cost);
@@ -92,6 +93,7 @@ namespace CloudWhale.Tests
             presentation.BuildNextHouseStage();
 
             presentation.BuildNextHouseStage();
+            presentation.Refresh();
 
             Assert.That(presentation.View.HouseAppearance, Is.EqualTo(IslandHouseAppearance.Complete));
             Assert.That(presentation.View.StatusMessage, Does.Contain("complete"));
