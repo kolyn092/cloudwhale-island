@@ -99,6 +99,76 @@ namespace CloudWhale.Tests
             Assert.That(presentation.View.StatusMessage, Does.Contain("complete"));
         }
 
+        [Test]
+        public void Garden_RemainsLockedWithVacantLotGuidance_UntilTheHouseIsComplete()
+        {
+            var session = CreateSession(new HouseFoundationCost(5, 5, 5, 5));
+            var presentation = new IslandPresentationController(session, session.HouseFoundationCost);
+
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Locked));
+            Assert.That(presentation.View.CanBuildNextGardenStage, Is.False);
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("complete the house"));
+
+            presentation.BuildNextGardenStage();
+            presentation.Refresh();
+
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Locked));
+            Assert.That(presentation.View.StatusMessage, Does.Contain("complete the house"));
+        }
+
+        [Test]
+        public void Garden_ShowsConfiguredCostAndMissingResourcesWithoutChangingTheGarden()
+        {
+            var cost = new HouseFoundationCost(5, 5, 5, 5);
+            var session = CreateSession(cost);
+            session.AddResources(new ResourceAmounts(15, 15, 15, 15));
+            var presentation = new IslandPresentationController(session, cost);
+            presentation.BuildNextHouseStage();
+            presentation.BuildNextHouseStage();
+            presentation.BuildNextHouseStage();
+
+            Assert.That(presentation.View.CanBuildNextGardenStage, Is.True);
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("garden foundation"));
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("Driftwood 5"));
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("Cloud Cotton 5"));
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("Dew 5"));
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("Stardust 5"));
+
+            presentation.BuildNextGardenStage();
+            presentation.Refresh();
+
+            Assert.That(presentation.View.GardenStage, Is.EqualTo(GardenStage.Locked));
+            Assert.That(presentation.View.StatusMessage, Does.Contain("Not enough resources"));
+        }
+
+        [Test]
+        public void BuildNextGardenStage_ImmediatelyChangesAllFourAppearancesAndHidesActionAfterCompletion()
+        {
+            var cost = new HouseFoundationCost(5, 5, 5, 5);
+            var session = CreateSession(cost);
+            session.AddResources(new ResourceAmounts(30, 30, 30, 30));
+            var presentation = new IslandPresentationController(session, cost);
+            presentation.BuildNextHouseStage();
+            presentation.BuildNextHouseStage();
+            presentation.BuildNextHouseStage();
+
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Locked));
+            presentation.BuildNextGardenStage();
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Foundation));
+            presentation.BuildNextGardenStage();
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Framing));
+            presentation.BuildNextGardenStage();
+
+            Assert.That(presentation.View.GardenStage, Is.EqualTo(GardenStage.Complete));
+            Assert.That(presentation.View.GardenAppearance, Is.EqualTo(IslandGardenAppearance.Complete));
+            Assert.That(presentation.View.CanBuildNextGardenStage, Is.False);
+            Assert.That(presentation.View.GardenNextAction, Does.Contain("complete"));
+
+            presentation.BuildNextGardenStage();
+            presentation.Refresh();
+            Assert.That(presentation.View.StatusMessage, Does.Contain("garden is already complete"));
+        }
+
         private static void AssertBuildActionShows(HouseFoundationCost cost, IslandPresentationController presentation, string expectedStage)
         {
             Assert.That(presentation.View.CanBuildNextHouseStage, Is.True);
