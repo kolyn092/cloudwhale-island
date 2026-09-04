@@ -287,12 +287,19 @@ namespace CloudWhale.Game
 
         private static bool HasValidFacilities(GameStateData state)
         {
-            if (state.facilities == null || state.facilities.Length == 0) return true;
+            if (state.facilities == null || state.facilities.Length == 0) return state.gardenCompletedAtUnixSeconds == 0;
             if (state.facilities.Length != 1) return false;
             var garden = state.facilities[0];
             if (garden == null || garden.id != FacilityExtensionState.GardenId) return false;
             if (garden.stage < (int)GardenStage.Locked || garden.stage > (int)GardenStage.Complete) return false;
-            return state.gardenCompletedAtUnixSeconds == 0 || HasValidTimestamp(state.gardenCompletedAtUnixSeconds);
+
+            var gardenStage = (GardenStage)garden.stage;
+            if (state.houseStage != (int)HouseStage.Complete && gardenStage != GardenStage.Locked) return false;
+            if (gardenStage != GardenStage.Complete) return state.gardenCompletedAtUnixSeconds == 0;
+
+            return state.gardenCompletedAtUnixSeconds != 0
+                && HasValidTimestamp(state.gardenCompletedAtUnixSeconds)
+                && state.gardenCompletedAtUnixSeconds <= state.savedAtUnixSeconds;
         }
 
         private static void RestoreGarden(GameStateData state)
@@ -301,11 +308,6 @@ namespace CloudWhale.Game
             {
                 state.facilities = new[] { new FacilityExtensionState { id = FacilityExtensionState.GardenId, stage = (int)GardenStage.Locked } };
                 return;
-            }
-
-            if (GetGardenStage(state) == GardenStage.Complete && state.gardenCompletedAtUnixSeconds == 0)
-            {
-                state.gardenCompletedAtUnixSeconds = state.savedAtUnixSeconds;
             }
         }
 
