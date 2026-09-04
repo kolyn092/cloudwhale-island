@@ -242,7 +242,9 @@ namespace CloudWhale.Game
                 var completedAt = data.gardenCompletedAtUnixSeconds;
                 var savedAt = data.savedAtUnixSeconds;
                 var elapsedUntilComplete = Math.Max(0, completedAt - savedAt);
-                var firstBonusInterval = Math.Max(1, (elapsedUntilComplete + production.IntervalSeconds - 1) / production.IntervalSeconds);
+                // A cycle completing exactly when the garden finishes was produced before completion.
+                // The bonus starts at the next completed cycle, not at this boundary.
+                var firstBonusInterval = elapsedUntilComplete / production.IntervalSeconds + 1;
                 var bonusIntervals = Math.Max(0, intervals - firstBonusInterval + 1);
                 var bonus = bonusIntervals > int.MaxValue / production.AmountPerInterval ? int.MaxValue : (int)bonusIntervals * production.AmountPerInterval;
                 data.cloudCotton = SaturatingAdd(data.cloudCotton, bonus);

@@ -315,6 +315,40 @@ namespace CloudWhale.Tests
         }
 
         [Test]
+        public void Production_GardenCompletedOnProductionBoundary_AppliesBonusFromTheFollowingCompletedInterval()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(30, 30, 30, 30));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(60);
+            storage.FailWrites = true;
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            storage.FailWrites = false;
+            session.AdvanceWhileOpen();
+
+            Assert.That(session.State.Resources.Driftwood, Is.EqualTo(1));
+            Assert.That(session.State.Resources.CloudCotton, Is.EqualTo(1));
+            Assert.That(session.State.Resources.Dew, Is.EqualTo(1));
+            Assert.That(session.State.Resources.Stardust, Is.EqualTo(1));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(60);
+            session.AdvanceWhileOpen();
+
+            Assert.That(session.State.Resources.Driftwood, Is.EqualTo(2));
+            Assert.That(session.State.Resources.CloudCotton, Is.EqualTo(3));
+            Assert.That(session.State.Resources.Dew, Is.EqualTo(3));
+            Assert.That(session.State.Resources.Stardust, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Load_CompletedGarden_DoublesOnlyCloudCottonAndDewForOfflineCompletedIntervals()
         {
             var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 2, 0, DateTimeKind.Utc));
