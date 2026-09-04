@@ -284,6 +284,93 @@ namespace CloudWhale.Tests
             Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
         }
 
+        [TestCase(HouseStage.Unbuilt, GardenStage.Foundation)]
+        [TestCase(HouseStage.Unbuilt, GardenStage.Framing)]
+        [TestCase(HouseStage.Unbuilt, GardenStage.Complete)]
+        [TestCase(HouseStage.Foundation, GardenStage.Foundation)]
+        [TestCase(HouseStage.Foundation, GardenStage.Framing)]
+        [TestCase(HouseStage.Foundation, GardenStage.Complete)]
+        [TestCase(HouseStage.Framing, GardenStage.Foundation)]
+        [TestCase(HouseStage.Framing, GardenStage.Framing)]
+        [TestCase(HouseStage.Framing, GardenStage.Complete)]
+        public void Load_GardenProgressBeforeHouseCompletion_RecoversFreshState(HouseStage houseStage, GardenStage gardenStage)
+        {
+            var invalid = GameStateData.Fresh(DateTime.UtcNow);
+            invalid.houseStage = (int)houseStage;
+            invalid.facilities[0].stage = (int)gardenStage;
+            if (gardenStage == GardenStage.Complete)
+            {
+                invalid.gardenCompletedAtUnixSeconds = invalid.savedAtUnixSeconds;
+            }
+
+            var session = new GameSession(
+                new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) },
+                new ManualClock(DateTime.UtcNow),
+                ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Unbuilt));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
+        [TestCase(GardenStage.Locked)]
+        [TestCase(GardenStage.Foundation)]
+        [TestCase(GardenStage.Framing)]
+        public void Load_GardenCompletionTimeBeforeGardenCompletion_RecoversFreshState(GardenStage gardenStage)
+        {
+            var invalid = GameStateData.Fresh(DateTime.UtcNow);
+            invalid.houseStage = (int)HouseStage.Complete;
+            invalid.facilities[0].stage = (int)gardenStage;
+            invalid.gardenCompletedAtUnixSeconds = invalid.savedAtUnixSeconds;
+
+            var session = new GameSession(
+                new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) },
+                new ManualClock(DateTime.UtcNow),
+                ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
+        [TestCase(0L)]
+        [TestCase(long.MinValue)]
+        public void Load_CompletedGardenWithMissingOrInvalidCompletionTime_RecoversFreshState(long completedAtUnixSeconds)
+        {
+            var invalid = CompletedGardenSave(DateTime.UtcNow);
+            invalid.gardenCompletedAtUnixSeconds = completedAtUnixSeconds;
+
+            var session = new GameSession(
+                new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) },
+                new ManualClock(DateTime.UtcNow),
+                ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
+        [Test]
+        public void Load_CompletedGardenWithFutureCompletionTime_RecoversFreshState()
+        {
+            var invalid = CompletedGardenSave(DateTime.UtcNow);
+            invalid.gardenCompletedAtUnixSeconds = invalid.savedAtUnixSeconds + 1;
+
+            var session = new GameSession(
+                new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) },
+                new ManualClock(DateTime.UtcNow),
+                ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
         [Test]
         public void Production_DoublesOnlyCloudCottonAndDewAfterGardenCompletion_WithoutRetroactiveBonusAfterFailedSave()
         {
@@ -639,6 +726,14 @@ namespace CloudWhale.Tests
         {
             Assert.That(GameStateSerializer.TryDeserialize(storage.Value, out var saved), Is.True);
             return saved.savedAtUnixSeconds;
+        }
+
+        private static GameStateData CompletedGardenSave(DateTime savedAt)
+        {
+            var state = GameStateData.Fresh(savedAt);
+            state.houseStage = (int)HouseStage.Complete;
+            state.facilities[0].stage = (int)GardenStage.Complete;
+            return state;
         }
 
         private static void InvokeRuntimeSignal(OpenGameProductionRuntime runtime, string methodName, params object[] arguments)
