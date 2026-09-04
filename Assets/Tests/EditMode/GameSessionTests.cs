@@ -161,6 +161,194 @@ namespace CloudWhale.Tests
         }
 
         [Test]
+        public void BuildGarden_RequiresCompletedHouse_AndLeavesStateAndSaveUnchanged()
+        {
+            var storage = new InMemoryStorage();
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+            session.Load();
+            var savedBeforeAttempt = storage.Value;
+            var writesBeforeAttempt = storage.WriteCount;
+
+            Assert.That(session.TryBuildNextGardenStage(), Is.False);
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+            Assert.That(session.State.Resources, Is.EqualTo(ResourceAmounts.Zero));
+            Assert.That(storage.Value, Is.EqualTo(savedBeforeAttempt));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeAttempt));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.HouseMustBeComplete));
+        }
+
+        [Test]
+        public void BuildGarden_UsesFiveOfEachResourcePerStage_PersistsSingleGarden_AndRejectsCompletionRetry()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(30, 30, 30, 30));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            var writesBeforeGarden = storage.WriteCount;
+
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Foundation));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(10, 10, 10, 10)));
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Framing));
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(5, 5, 5, 5)));
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Complete));
+            Assert.That(session.State.Resources, Is.EqualTo(ResourceAmounts.Zero));
+            Assert.That(storage.WriteCount, Is.EqualTo(writesBeforeGarden + 3));
+            Assert.That(GameStateSerializer.TryDeserialize(storage.Value, out var saved), Is.True);
+            Assert.That(saved.facilities, Has.Length.EqualTo(1));
+            Assert.That(saved.facilities[0].id, Is.EqualTo("garden"));
+            Assert.That(saved.facilities[0].stage, Is.EqualTo((int)GardenStage.Complete));
+
+            var savedBeforeRetry = storage.Value;
+            Assert.That(session.TryBuildNextGardenStage(), Is.False);
+            Assert.That(storage.Value, Is.EqualTo(savedBeforeRetry));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.GardenAlreadyComplete));
+        }
+
+        [Test]
+        public void BuildGarden_RejectsInsufficientResourcesWithoutChangingStateOrSave()
+        {
+            var storage = new InMemoryStorage();
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(15, 15, 15, 15));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            session.AddResources(new ResourceAmounts(5, 5, 4, 5));
+            var stateBeforeAttempt = session.State;
+            var savedBeforeAttempt = storage.Value;
+
+            Assert.That(session.TryBuildNextGardenStage(), Is.False);
+            Assert.That(session.State.Resources, Is.EqualTo(stateBeforeAttempt.Resources));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+            Assert.That(storage.Value, Is.EqualTo(savedBeforeAttempt));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.InsufficientResources));
+        }
+
+        [Test]
+        public void Load_EmptyFacilityList_RestoresLockedGardenWithoutChangingSaveVersion()
+        {
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var legacy = GameStateData.Fresh(clock.UtcNow);
+            legacy.facilities = Array.Empty<FacilityExtensionState>();
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(legacy) };
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+            Assert.That(GameStateSerializer.TryDeserialize(storage.Value, out var saved), Is.True);
+            Assert.That(saved.version, Is.EqualTo(GameStateData.CurrentVersion));
+            Assert.That(saved.facilities, Has.Length.EqualTo(1));
+            Assert.That(saved.facilities[0].id, Is.EqualTo("garden"));
+        }
+
+        [TestCase("other", 0)]
+        [TestCase("garden", 99)]
+        public void Load_InvalidFacility_RecoversFreshState(string id, int stage)
+        {
+            var invalid = GameStateData.Fresh(DateTime.UtcNow);
+            invalid.facilities = new[] { new FacilityExtensionState { id = id, stage = stage } };
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) };
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.HouseStage, Is.EqualTo(HouseStage.Unbuilt));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
+        [Test]
+        public void Load_DuplicateGarden_RecoversFreshState()
+        {
+            var invalid = GameStateData.Fresh(DateTime.UtcNow);
+            invalid.facilities = new[]
+            {
+                new FacilityExtensionState { id = "garden", stage = 0 },
+                new FacilityExtensionState { id = "garden", stage = 0 },
+            };
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(invalid) };
+            var session = new GameSession(storage, new ManualClock(DateTime.UtcNow), ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.RecoveredInvalidSave));
+            Assert.That(session.State.GardenStage, Is.EqualTo(GardenStage.Locked));
+        }
+
+        [Test]
+        public void Production_DoublesOnlyCloudCottonAndDewAfterGardenCompletion_WithoutRetroactiveBonusAfterFailedSave()
+        {
+            var storage = new InMemoryStorage();
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+            session.Load();
+            session.AddResources(new ResourceAmounts(30, 30, 30, 30));
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            Assert.That(session.TryBuildNextHouseStage(), Is.True);
+            clock.UtcNow = clock.UtcNow.AddSeconds(61);
+            storage.FailWrites = true;
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.TryBuildNextGardenStage(), Is.True);
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.StorageUnavailable));
+
+            clock.UtcNow = clock.UtcNow.AddSeconds(59);
+            storage.FailWrites = false;
+            session.AdvanceWhileOpen();
+
+            // The completed cycle ending before garden completion is normal (1); the later cycle is boosted (2).
+            Assert.That(session.State.Resources.Driftwood, Is.EqualTo(2));
+            Assert.That(session.State.Resources.CloudCotton, Is.EqualTo(3));
+            Assert.That(session.State.Resources.Dew, Is.EqualTo(3));
+            Assert.That(session.State.Resources.Stardust, Is.EqualTo(2));
+            Assert.That(session.LastReason, Is.EqualTo(GameReason.None));
+        }
+
+        [Test]
+        public void Load_CompletedGarden_DoublesOnlyCloudCottonAndDewForOfflineCompletedIntervals()
+        {
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 2, 0, DateTimeKind.Utc));
+            var saved = GameStateData.Fresh(clock.UtcNow.AddMinutes(-2));
+            saved.houseStage = (int)HouseStage.Complete;
+            saved.facilities[0].stage = (int)GardenStage.Complete;
+            saved.gardenCompletedAtUnixSeconds = saved.savedAtUnixSeconds;
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(saved) };
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.State.Resources.Driftwood, Is.EqualTo(2));
+            Assert.That(session.State.Resources.CloudCotton, Is.EqualTo(4));
+            Assert.That(session.State.Resources.Dew, Is.EqualTo(4));
+            Assert.That(session.State.Resources.Stardust, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Load_UnfinishedGarden_DoesNotChangeOfflineProduction()
+        {
+            var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 2, 0, DateTimeKind.Utc));
+            var saved = GameStateData.Fresh(clock.UtcNow.AddMinutes(-2));
+            saved.houseStage = (int)HouseStage.Complete;
+            saved.facilities[0].stage = (int)GardenStage.Framing;
+            var storage = new InMemoryStorage { Value = GameStateSerializer.Serialize(saved) };
+            var session = new GameSession(storage, clock, ProductionSettings.Default);
+
+            session.Load();
+
+            Assert.That(session.State.Resources, Is.EqualTo(new ResourceAmounts(2, 2, 2, 2)));
+        }
+
+        [Test]
         public void Load_LegacyFoundationSave_RemainsValidAndCanAdvanceToFraming()
         {
             var clock = new ManualClock(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc));

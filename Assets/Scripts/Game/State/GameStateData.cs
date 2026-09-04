@@ -10,12 +10,22 @@ namespace CloudWhale.Game
         Complete = 3,
     }
 
+    public enum GardenStage
+    {
+        Locked = 0,
+        Foundation = 1,
+        Framing = 2,
+        Complete = 3,
+    }
+
     public enum GameReason
     {
         None = 0,
         InsufficientResources,
         HouseAlreadyHasFoundation,
         HouseAlreadyComplete,
+        HouseMustBeComplete,
+        GardenAlreadyComplete,
         RecoveredInvalidSave,
         ClockMovedBackward,
         StorageUnavailable,
@@ -37,6 +47,7 @@ namespace CloudWhale.Game
         // Extension fields are kept in every save now so later units can add their rules without a format reset.
         public int starlightParts;
         public FacilityExtensionState[] facilities;
+        public long gardenCompletedAtUnixSeconds;
         public string[] unlockedStoryIds;
         public DecorationPlacement[] decorations;
 
@@ -46,7 +57,7 @@ namespace CloudWhale.Game
             {
                 version = CurrentVersion,
                 savedAtUnixSeconds = ToUnixSeconds(utcNow),
-                facilities = Array.Empty<FacilityExtensionState>(),
+                facilities = new[] { new FacilityExtensionState { id = FacilityExtensionState.GardenId, stage = (int)GardenStage.Locked } },
                 unlockedStoryIds = Array.Empty<string>(),
                 decorations = Array.Empty<DecorationPlacement>(),
             };
@@ -68,6 +79,8 @@ namespace CloudWhale.Game
     [Serializable]
     public sealed class FacilityExtensionState
     {
+        public const string GardenId = "garden";
+
         public string id;
         public int stage;
     }
@@ -126,14 +139,21 @@ namespace CloudWhale.Game
     public readonly struct GameStateSnapshot
     {
         public GameStateSnapshot(ResourceAmounts resources, HouseStage houseStage, int starlightParts)
+            : this(resources, houseStage, GardenStage.Locked, starlightParts)
+        {
+        }
+
+        public GameStateSnapshot(ResourceAmounts resources, HouseStage houseStage, GardenStage gardenStage, int starlightParts)
         {
             Resources = resources;
             HouseStage = houseStage;
+            GardenStage = gardenStage;
             StarlightParts = starlightParts;
         }
 
         public ResourceAmounts Resources { get; }
         public HouseStage HouseStage { get; }
+        public GardenStage GardenStage { get; }
         public int StarlightParts { get; }
     }
 }
