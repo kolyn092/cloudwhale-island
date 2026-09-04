@@ -14,15 +14,16 @@ namespace CloudWhale.Game
 
     public readonly struct ProductionSettings
     {
-        // Runtime tuning defaults. Keep the foundation cost nonzero so starting a new game
-        // still requires a production loop before a house can be built.
+        // Runtime tuning defaults. All house stages share this one adjustable cost.
         public const int DefaultIntervalSeconds = 60;
         public const int DefaultAmountPerInterval = 1;
-        public static readonly HouseFoundationCost DefaultHouseFoundationCost = new HouseFoundationCost(5, 5, 5, 5);
+        public static readonly HouseFoundationCost DefaultHouseStageCost = new HouseFoundationCost(5, 5, 5, 5);
+        // Kept for callers that display the first stage while the presentation catches up with all stages.
+        public static readonly HouseFoundationCost DefaultHouseFoundationCost = DefaultHouseStageCost;
         public static readonly ProductionSettings Default = new ProductionSettings(
             DefaultIntervalSeconds,
             DefaultAmountPerInterval,
-            DefaultHouseFoundationCost);
+            DefaultHouseStageCost);
 
         public ProductionSettings(int intervalSeconds, int amountPerInterval, HouseFoundationCost houseFoundationCost)
         {
@@ -36,6 +37,7 @@ namespace CloudWhale.Game
         public int IntervalSeconds { get; }
         public int AmountPerInterval { get; }
         public HouseFoundationCost HouseFoundationCost { get; }
+        public HouseFoundationCost HouseStageCost => HouseFoundationCost;
     }
 
     public sealed class GameSession
@@ -56,8 +58,9 @@ namespace CloudWhale.Game
         public GameReason LastReason { get; private set; }
         public GameStateSnapshot State => ToSnapshot(data ?? GameStateData.Fresh(clock.UtcNow));
         public int ProductionIntervalSeconds => production.IntervalSeconds;
-        // Presentation reads this value only; TryBuildHouseFoundation remains the sole mutation boundary.
+        // Presentation reads costs only; the public build actions remain the mutation boundary.
         public HouseFoundationCost HouseFoundationCost => production.HouseFoundationCost;
+        public HouseFoundationCost HouseStageCost => production.HouseFoundationCost;
 
         public void Load()
         {
@@ -136,11 +139,27 @@ namespace CloudWhale.Game
             EnsureLoaded();
             if ((HouseStage)data.houseStage != HouseStage.Unbuilt)
             {
-                LastReason = GameReason.HouseAlreadyHasFoundation;
+                LastReason = (HouseStage)data.houseStage == HouseStage.Complete
+                    ? GameReason.HouseAlreadyComplete
+                    : GameReason.HouseAlreadyHasFoundation;
                 return false;
             }
 
-            var cost = production.HouseFoundationCost.Resources;
+            return TryBuildNextHouseStage();
+        }
+
+        // The presentation invokes this action to build only the next allowed house stage.
+        public bool TryBuildNextHouseStage()
+        {
+            EnsureLoaded();
+            var currentStage = (HouseStage)data.houseStage;
+            if (currentStage == HouseStage.Complete)
+            {
+                LastReason = GameReason.HouseAlreadyComplete;
+                return false;
+            }
+
+            var cost = production.HouseStageCost.Resources;
             if (data.driftwood < cost.Driftwood || data.cloudCotton < cost.CloudCotton || data.dew < cost.Dew || data.stardust < cost.Stardust)
             {
                 LastReason = GameReason.InsufficientResources;
@@ -151,7 +170,7 @@ namespace CloudWhale.Game
             data.cloudCotton -= cost.CloudCotton;
             data.dew -= cost.Dew;
             data.stardust -= cost.Stardust;
-            data.houseStage = (int)HouseStage.Foundation;
+            data.houseStage = (int)(currentStage + 1);
             LastReason = GameReason.None;
             Persist(clock.UtcNow);
             return true;
@@ -205,7 +224,7 @@ namespace CloudWhale.Game
             return state.version == GameStateData.CurrentVersion
                 && state.driftwood >= 0 && state.cloudCotton >= 0 && state.dew >= 0 && state.stardust >= 0
                 && state.starlightParts >= 0
-                && state.houseStage >= (int)HouseStage.Unbuilt && state.houseStage <= (int)HouseStage.Foundation;
+                && state.houseStage >= (int)HouseStage.Unbuilt && state.houseStage <= (int)HouseStage.Complete;
         }
 
         private static DateTime FromUnixSeconds(long seconds)
