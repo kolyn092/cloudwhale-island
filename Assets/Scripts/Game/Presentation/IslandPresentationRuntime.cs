@@ -389,12 +389,14 @@ namespace CloudWhale.Game.Presentation
             var root = CreateRoot("Completed House Model");
             var wall = new Color(0.95f, 0.82f, 0.57f);
             var roof = new Color(0.64f, 0.22f, 0.18f);
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Walls", center + new Vector3(0f, 1.15f, 0f), new Vector3(2.05f, 1.5f, 1.65f), wall), root);
-            var roofObject = CreatePrimitive(PrimitiveType.Cube, "Completed House Roof", center + new Vector3(0f, 2.25f, 0f), new Vector3(2.45f, 0.52f, 2.05f), roof);
+            // The island is curved: embed the footing into it, with its top flush with the walls.
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Footing", center + new Vector3(0f, -0.25f, 0f), new Vector3(2.13f, 0.5f, 1.73f), new Color(0.58f, 0.55f, 0.48f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Walls", center + new Vector3(0f, 0.75f, 0f), new Vector3(2.05f, 1.5f, 1.65f), wall), root);
+            var roofObject = CreatePrimitive(PrimitiveType.Cube, "Completed House Roof", center + new Vector3(0f, 1.85f, 0f), new Vector3(2.45f, 0.52f, 2.05f), roof);
             roofObject.transform.rotation = Quaternion.Euler(0f, 0f, 8f);
             Parent(roofObject, root);
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Door", center + new Vector3(0f, 0.92f, -0.84f), new Vector3(0.42f, 0.8f, 0.08f), new Color(0.32f, 0.16f, 0.07f)), root);
-            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Completed House Chimney", center + new Vector3(0.65f, 2.75f, 0.2f), new Vector3(0.2f, 0.48f, 0.2f), new Color(0.42f, 0.35f, 0.31f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Door", center + new Vector3(0f, 0.52f, -0.84f), new Vector3(0.42f, 0.8f, 0.08f), new Color(0.32f, 0.16f, 0.07f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Completed House Chimney", center + new Vector3(0.65f, 2.35f, 0.2f), new Vector3(0.2f, 0.48f, 0.2f), new Color(0.42f, 0.35f, 0.31f)), root);
             return root;
         }
 
