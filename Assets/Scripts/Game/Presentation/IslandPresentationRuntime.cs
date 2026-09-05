@@ -264,6 +264,7 @@ namespace CloudWhale.Game.Presentation
             var tailRight = CreatePrimitive(PrimitiveType.Sphere, "Whale Tail Right", new Vector3(4.05f, -1.45f, 1.65f), new Vector3(1.7f, 0.35f, 1.25f), fin);
             tailRight.transform.rotation = Quaternion.Euler(0f, 0f, -28f); Parent(tailRight, root);
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout", new Vector3(-2.5f, 0.2f, 0.4f), new Vector3(0.38f, 0.8f, 0.38f), Color.white), root);
+            root.transform.localScale = new Vector3(1.3f, 1.1f, 1.3f);
         }
 
         private void CreateIsland()
@@ -306,7 +307,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateLockedGarden(Vector3 center)
         {
             var root = CreateRoot("Garden Locked Vacant Lot Model");
-            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Locked Clearing", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.55f, 0.4f, 0.22f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Clearing", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.55f, 0.4f, 0.22f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Locked Sign Post", center + new Vector3(-0.72f, 0.5f, 0f), new Vector3(0.08f, 0.48f, 0.08f), new Color(0.36f, 0.2f, 0.09f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Sign", center + new Vector3(-0.72f, 0.88f, 0f), new Vector3(0.62f, 0.32f, 0.08f), new Color(0.68f, 0.47f, 0.2f)), root);
             return root;
@@ -315,7 +316,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateGardenFoundation(Vector3 center)
         {
             var root = CreateRoot("Garden Foundation Model");
-            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Foundation Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
             foreach (var offset in new[] { -0.55f, 0.55f })
             {
                 Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Bed", center + new Vector3(offset, 0.18f, 0f), new Vector3(0.72f, 0.13f, 1.65f), new Color(0.63f, 0.36f, 0.16f)), root);
@@ -326,7 +327,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateGardenFraming(Vector3 center)
         {
             var root = CreateRoot("Garden Framing Model");
-            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Framing Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Framing Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
             foreach (var offset in new[] { new Vector3(-0.82f, 0.75f, -0.62f), new Vector3(0.82f, 0.75f, -0.62f), new Vector3(-0.82f, 0.75f, 0.62f), new Vector3(0.82f, 0.75f, 0.62f) })
             {
                 Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Framing Post", center + offset, new Vector3(0.08f, 0.7f, 0.08f), new Color(0.39f, 0.22f, 0.1f)), root);
@@ -339,11 +340,27 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateCompletedGarden(Vector3 center)
         {
             var root = CreateRoot("Completed Garden Model");
-            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Completed Garden Soil", center, new Vector3(2.05f, 0.12f, 1.55f), new Color(0.39f, 0.23f, 0.1f)), root);
-            foreach (var offset in new[] { new Vector3(-0.56f, 0.34f, -0.45f), new Vector3(0.5f, 0.34f, -0.32f), new Vector3(-0.25f, 0.34f, 0.5f), new Vector3(0.7f, 0.34f, 0.55f) })
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed Garden Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
+            var flowerColors = new[] { new Color(1f, 0.45f, 0.6f), new Color(1f, 0.86f, 0.4f), new Color(0.73f, 0.56f, 1f) };
+            for (var row = 0; row < 2; row++)
             {
-                Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Bloom", center + offset, new Vector3(0.48f, 0.55f, 0.48f), new Color(0.36f, 0.72f, 0.3f)), root);
-                Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Flower", center + offset + Vector3.up * 0.3f, new Vector3(0.18f, 0.18f, 0.18f), new Color(0.98f, 0.68f, 0.36f)), root);
+                for (var column = 0; column < 3; column++)
+                {
+                    var position = center + new Vector3((column - 1) * 0.62f, 0.12f, (row - 0.5f) * 0.8f);
+                    var height = 0.42f + ((row + column) % 2) * 0.12f;
+                    Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Flower Stem", position + Vector3.up * (height / 2), new Vector3(0.055f, height / 2, 0.055f), new Color(0.2f, 0.5f, 0.24f)), root);
+                    var leaf = CreatePrimitive(PrimitiveType.Sphere, "Garden Flower Leaf", position + new Vector3(0.1f, height * 0.4f, 0), new Vector3(0.25f, 0.07f, 0.12f), new Color(0.3f, 0.66f, 0.3f));
+                    leaf.transform.rotation = Quaternion.Euler(0, row * 90, 25);
+                    Parent(leaf, root);
+                    var bloom = position + Vector3.up * height;
+                    for (var petal = 0; petal < 5; petal++)
+                    {
+                        var angle = petal * Mathf.PI * 2 / 5;
+                        var offset = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * 0.15f;
+                        Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Flower Petal", bloom + offset, new Vector3(0.25f, 0.14f, 0.25f), flowerColors[(row + column) % flowerColors.Length]), root);
+                    }
+                    Parent(CreatePrimitive(PrimitiveType.Sphere, "Garden Flower Center", bloom + Vector3.up * 0.05f, new Vector3(0.17f, 0.15f, 0.17f), new Color(1f, 0.66f, 0.12f)), root);
+                }
             }
             return root;
         }
