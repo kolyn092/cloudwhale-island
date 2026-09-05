@@ -269,7 +269,8 @@ namespace CloudWhale.Game.Presentation
             tailLeft.transform.rotation = Quaternion.Euler(0f, 0f, 28f); Parent(tailLeft, root);
             var tailRight = CreatePrimitive(PrimitiveType.Sphere, "Whale Tail Right", new Vector3(4.05f, -1.45f, 1.65f), new Vector3(1.7f, 0.35f, 1.25f), fin);
             tailRight.transform.rotation = Quaternion.Euler(0f, 0f, -28f); Parent(tailRight, root);
-            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout", new Vector3(-2.5f, 0.2f, 0.4f), new Vector3(0.38f, 0.8f, 0.38f), Color.white), root);
+            // Keep the puff above the exposed head, outside the meadow footprint.
+            Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout", new Vector3(-3.6f, 1.8f, 0.4f), new Vector3(0.38f, 0.8f, 0.38f), Color.white), root);
             root.transform.localScale = new Vector3(1.3f, 1.1f, 1.5f);
             // Align the body's center with the meadow and embed its back into the soil.
             root.transform.position = new Vector3(0f, 0.25f, -0.6f);
