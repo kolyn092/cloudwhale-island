@@ -21,6 +21,9 @@ namespace CloudWhale.Game.Presentation
         private GUIStyle panelStyle;
         private GUIStyle textStyle;
         private GUIStyle buttonStyle;
+        private Camera orbitCamera;
+        private readonly IslandOrbitDrag orbit = new IslandOrbitDrag();
+        private float orbitDistance;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void StartAutomatically()
@@ -58,6 +61,15 @@ namespace CloudWhale.Game.Presentation
         {
             if (presentation == null) return;
             if (panelStyle == null) CreateStyles();
+            var pointer = Event.current;
+            var overPanel = new Rect(20, 20, 410, 338).Contains(pointer.mousePosition)
+                || new Rect(20, Screen.height - 62, 560, 42).Contains(pointer.mousePosition);
+            if (pointer.button == 0 && orbit.Handle(pointer.type, pointer.delta, overPanel))
+            {
+                ApplyCameraOrbit();
+                pointer.Use();
+            }
+            GUI.Label(new Rect(Screen.width - 290, Screen.height - 100, 270, 32), "Drag the island to look around", textStyle);
             var view = presentation.View;
             GUI.Box(new Rect(20, 20, 410, 338), GUIContent.none, panelStyle);
             GUI.Label(new Rect(38, 34, 370, 28), "Cloudwhale Island", textStyle);
@@ -130,6 +142,10 @@ namespace CloudWhale.Game.Presentation
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.57f, 0.79f, 0.91f);
             camera.fieldOfView = 42;
+            orbitCamera = camera;
+            orbitDistance = camera.transform.position.magnitude;
+            orbit.Yaw = camera.transform.eulerAngles.y;
+            orbit.Pitch = camera.transform.eulerAngles.x;
             var light = new GameObject("Soft Sun").AddComponent<Light>();
             light.type = LightType.Directional; light.intensity = 1.1f; light.shadows = LightShadows.Soft;
             light.transform.rotation = Quaternion.Euler(48, -32, 0);
@@ -158,6 +174,20 @@ namespace CloudWhale.Game.Presentation
             if (framing != null) framing.SetActive(appearance == IslandHouseAppearance.Framing);
             if (completedHouse != null) completedHouse.SetActive(appearance == IslandHouseAppearance.Complete);
         }
+
+        private void ApplyCameraOrbit()
+        {
+            if (orbitCamera == null) return;
+            var rotation = Quaternion.Euler(orbit.Pitch, orbit.Yaw, 0);
+            orbitCamera.transform.SetPositionAndRotation(rotation * Vector3.back * orbitDistance, rotation);
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) orbit.Cancel();
+        }
+
+        private void OnDisable() => orbit.Cancel();
 
         private void ApplyGardenStage()
         {
@@ -385,5 +415,34 @@ namespace CloudWhale.Game.Presentation
         {
             var texture = new Texture2D(1, 1); texture.SetPixel(0, 0, color); texture.Apply(); return texture;
         }
+    }
+
+    // GUI coordinates keep drag hit testing aligned with the IMGUI construction controls.
+    public sealed class IslandOrbitDrag
+    {
+        private bool dragging;
+        public float Yaw { get; set; }
+        public float Pitch { get; set; } = 30;
+
+        public bool Handle(EventType type, Vector2 delta, bool overPanel)
+        {
+            if (type == EventType.MouseDown)
+            {
+                dragging = !overPanel;
+                return dragging;
+            }
+            if (type == EventType.MouseUp || type == EventType.MouseLeaveWindow)
+            {
+                var wasDragging = dragging;
+                Cancel();
+                return wasDragging;
+            }
+            if (type != EventType.MouseDrag || !dragging) return false;
+            Yaw = Mathf.Repeat(Yaw - delta.x * 0.35f, 360);
+            Pitch = Mathf.Clamp(Pitch + delta.y * 0.25f, 15, 65);
+            return true;
+        }
+
+        public void Cancel() => dragging = false;
     }
 }
