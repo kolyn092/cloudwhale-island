@@ -270,6 +270,8 @@ namespace CloudWhale.Game.Presentation
         private void CreateIsland()
         {
             var root = CreateRoot("Floating Island Model");
+            // Keep the playable-looking land broad: the home occupies one small clearing, not the island itself.
+            root.transform.localScale = new Vector3(1.38f, 1f, 1.32f);
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Meadow", new Vector3(0f, 0.1f, 0f), new Vector3(7.8f, 1.25f, 5.4f), new Color(0.31f, 0.66f, 0.39f)), root);
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Soil", new Vector3(0f, -0.35f, 0f), new Vector3(7.0f, 1.15f, 4.75f), new Color(0.45f, 0.28f, 0.16f)), root);
             for (var i = 0; i < 7; i++)
@@ -368,6 +370,8 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateHouseFoundation(Vector3 center)
         {
             var root = CreateRoot("House Foundation Model");
+            root.transform.position = center;
+            root.transform.localScale = Vector3.one * 0.88f;
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "House Clearing", center, new Vector3(2.2f, 0.16f, 2.2f), new Color(0.8f, 0.63f, 0.39f)), root);
             var wood = new Color(0.59f, 0.35f, 0.17f);
             for (var row = -1; row <= 1; row++)
@@ -385,6 +389,8 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateHouseFraming(Vector3 center)
         {
             var root = CreateRoot("House Framing Model");
+            root.transform.position = center;
+            root.transform.localScale = Vector3.one * 0.88f;
             var wood = new Color(0.5f, 0.28f, 0.12f);
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "Framing Clearing", center, new Vector3(2.2f, 0.16f, 2.2f), new Color(0.8f, 0.63f, 0.39f)), root);
             foreach (var offset in new[]
@@ -404,6 +410,8 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateCompletedHouse(Vector3 center)
         {
             var root = CreateRoot("Completed House Model");
+            root.transform.position = center;
+            root.transform.localScale = Vector3.one * 0.88f;
             var wall = new Color(0.95f, 0.82f, 0.57f);
             var roof = new Color(0.64f, 0.22f, 0.18f);
             // The island is curved: embed the footing into it, with its top flush with the walls.
