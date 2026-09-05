@@ -64,12 +64,18 @@ namespace CloudWhale.Game.Presentation
             var pointer = Event.current;
             var overPanel = new Rect(20, 20, 410, 338).Contains(pointer.mousePosition)
                 || new Rect(20, Screen.height - 62, 560, 42).Contains(pointer.mousePosition);
+            if (pointer.type == EventType.ScrollWheel && !overPanel)
+            {
+                orbitDistance = Mathf.Clamp(orbitDistance * Mathf.Exp(pointer.delta.y * 0.04f), 10f, 34f);
+                ApplyCameraOrbit();
+                pointer.Use();
+            }
             if (pointer.button == 0 && orbit.Handle(pointer.type, pointer.delta, overPanel))
             {
                 ApplyCameraOrbit();
                 pointer.Use();
             }
-            GUI.Label(new Rect(Screen.width - 290, Screen.height - 100, 270, 32), "Drag the island to look around", textStyle);
+            GUI.Label(new Rect(Screen.width - 290, Screen.height - 110, 270, 46), "Drag to look around\nScroll to zoom in / out", textStyle);
             var view = presentation.View;
             GUI.Box(new Rect(20, 20, 410, 338), GUIContent.none, panelStyle);
             GUI.Label(new Rect(38, 34, 370, 28), "Cloudwhale Island", textStyle);
