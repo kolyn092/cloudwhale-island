@@ -61,6 +61,7 @@ namespace CloudWhale.Game
         // Presentation reads costs only; the public build actions remain the mutation boundary.
         public HouseFoundationCost HouseFoundationCost => production.HouseFoundationCost;
         public HouseFoundationCost HouseStageCost => production.HouseFoundationCost;
+        public HouseFoundationCost GardenStageCost => production.HouseStageCost;
 
         public void Load()
         {
@@ -87,6 +88,8 @@ namespace CloudWhale.Game
                 Persist(now, preserveReason: true);
                 return;
             }
+
+            RestoreGarden(data);
 
             var savedAt = FromUnixSeconds(data.savedAtUnixSeconds);
             if (savedAt > now)
@@ -176,6 +179,46 @@ namespace CloudWhale.Game
             return true;
         }
 
+        // The garden is the sole facility in the common facility list. It can start only after the house is complete.
+        public bool TryBuildNextGardenStage()
+        {
+            EnsureLoaded();
+            if ((HouseStage)data.houseStage != HouseStage.Complete)
+            {
+                LastReason = GameReason.HouseMustBeComplete;
+                return false;
+            }
+
+            var currentStage = GetGardenStage(data);
+            if (currentStage == GardenStage.Complete)
+            {
+                LastReason = GameReason.GardenAlreadyComplete;
+                return false;
+            }
+
+            var cost = production.HouseStageCost.Resources;
+            if (data.driftwood < cost.Driftwood || data.cloudCotton < cost.CloudCotton || data.dew < cost.Dew || data.stardust < cost.Stardust)
+            {
+                LastReason = GameReason.InsufficientResources;
+                return false;
+            }
+
+            data.driftwood -= cost.Driftwood;
+            data.cloudCotton -= cost.CloudCotton;
+            data.dew -= cost.Dew;
+            data.stardust -= cost.Stardust;
+            var nextStage = (GardenStage)((int)currentStage + 1);
+            data.facilities[0].stage = (int)nextStage;
+            if (nextStage == GardenStage.Complete)
+            {
+                data.gardenCompletedAtUnixSeconds = GameStateData.ToUnixSeconds(clock.UtcNow);
+            }
+
+            LastReason = GameReason.None;
+            Persist(clock.UtcNow);
+            return true;
+        }
+
         // Called by the runtime when the game becomes inactive or is closing. This retries persistence
         // without changing resources, house progress, or any other gameplay state.
         public void SaveCurrentProgress()
@@ -193,6 +236,20 @@ namespace CloudWhale.Game
             data.cloudCotton = SaturatingAdd(data.cloudCotton, grant);
             data.dew = SaturatingAdd(data.dew, grant);
             data.stardust = SaturatingAdd(data.stardust, grant);
+
+            if (GetGardenStage(data) == GardenStage.Complete)
+            {
+                var completedAt = data.gardenCompletedAtUnixSeconds;
+                var savedAt = data.savedAtUnixSeconds;
+                var elapsedUntilComplete = Math.Max(0, completedAt - savedAt);
+                // A cycle completing exactly when the garden finishes was produced before completion.
+                // The bonus starts at the next completed cycle, not at this boundary.
+                var firstBonusInterval = elapsedUntilComplete / production.IntervalSeconds + 1;
+                var bonusIntervals = Math.Max(0, intervals - firstBonusInterval + 1);
+                var bonus = bonusIntervals > int.MaxValue / production.AmountPerInterval ? int.MaxValue : (int)bonusIntervals * production.AmountPerInterval;
+                data.cloudCotton = SaturatingAdd(data.cloudCotton, bonus);
+                data.dew = SaturatingAdd(data.dew, bonus);
+            }
             return (int)Math.Min(intervals, int.MaxValue);
         }
 
@@ -224,8 +281,37 @@ namespace CloudWhale.Game
             return state.version == GameStateData.CurrentVersion
                 && state.driftwood >= 0 && state.cloudCotton >= 0 && state.dew >= 0 && state.stardust >= 0
                 && state.starlightParts >= 0
-                && state.houseStage >= (int)HouseStage.Unbuilt && state.houseStage <= (int)HouseStage.Complete;
+                && state.houseStage >= (int)HouseStage.Unbuilt && state.houseStage <= (int)HouseStage.Complete
+                && HasValidFacilities(state);
         }
+
+        private static bool HasValidFacilities(GameStateData state)
+        {
+            if (state.facilities == null || state.facilities.Length == 0) return state.gardenCompletedAtUnixSeconds == 0;
+            if (state.facilities.Length != 1) return false;
+            var garden = state.facilities[0];
+            if (garden == null || garden.id != FacilityExtensionState.GardenId) return false;
+            if (garden.stage < (int)GardenStage.Locked || garden.stage > (int)GardenStage.Complete) return false;
+
+            var gardenStage = (GardenStage)garden.stage;
+            if (state.houseStage != (int)HouseStage.Complete && gardenStage != GardenStage.Locked) return false;
+            if (gardenStage != GardenStage.Complete) return state.gardenCompletedAtUnixSeconds == 0;
+
+            return state.gardenCompletedAtUnixSeconds != 0
+                && HasValidTimestamp(state.gardenCompletedAtUnixSeconds)
+                && state.gardenCompletedAtUnixSeconds <= state.savedAtUnixSeconds;
+        }
+
+        private static void RestoreGarden(GameStateData state)
+        {
+            if (state.facilities == null || state.facilities.Length == 0)
+            {
+                state.facilities = new[] { new FacilityExtensionState { id = FacilityExtensionState.GardenId, stage = (int)GardenStage.Locked } };
+                return;
+            }
+        }
+
+        private static GardenStage GetGardenStage(GameStateData state) => (GardenStage)state.facilities[0].stage;
 
         private static DateTime FromUnixSeconds(long seconds)
         {
@@ -248,7 +334,7 @@ namespace CloudWhale.Game
 
         private static GameStateSnapshot ToSnapshot(GameStateData state)
         {
-            return new GameStateSnapshot(new ResourceAmounts(state.driftwood, state.cloudCotton, state.dew, state.stardust), (HouseStage)state.houseStage, state.starlightParts);
+            return new GameStateSnapshot(new ResourceAmounts(state.driftwood, state.cloudCotton, state.dew, state.stardust), (HouseStage)state.houseStage, GetGardenStage(state), state.starlightParts);
         }
     }
 
