@@ -8,6 +8,33 @@ namespace CloudWhale.Tests
     public sealed class IslandPresentationControllerTests
     {
         [Test]
+        public void Orbit_DragCanReachBacksideAndKeepsElevationWithinLimits()
+        {
+            var orbit = new IslandOrbitDrag();
+            orbit.Handle(UnityEngine.EventType.MouseDown, UnityEngine.Vector2.zero, false);
+            orbit.Handle(UnityEngine.EventType.MouseDrag, new UnityEngine.Vector2(180 / 0.35f, 1000), false);
+            Assert.That(orbit.Yaw, Is.EqualTo(180).Within(0.01));
+            Assert.That(orbit.Pitch, Is.EqualTo(65));
+            orbit.Handle(UnityEngine.EventType.MouseDrag, new UnityEngine.Vector2(0, -1000), false);
+            Assert.That(orbit.Pitch, Is.EqualTo(15));
+        }
+
+        [Test]
+        public void Orbit_PanelPressReleaseAndFocusLossDoNotRotateCamera()
+        {
+            var orbit = new IslandOrbitDrag();
+            Assert.That(orbit.Handle(UnityEngine.EventType.MouseDown, UnityEngine.Vector2.zero, true), Is.False);
+            Assert.That(orbit.Handle(UnityEngine.EventType.MouseDrag, UnityEngine.Vector2.one, false), Is.False);
+            orbit.Handle(UnityEngine.EventType.MouseDown, UnityEngine.Vector2.zero, false);
+            orbit.Handle(UnityEngine.EventType.MouseUp, UnityEngine.Vector2.zero, false);
+            Assert.That(orbit.Handle(UnityEngine.EventType.MouseDrag, UnityEngine.Vector2.one, false), Is.False);
+            orbit.Handle(UnityEngine.EventType.MouseDown, UnityEngine.Vector2.zero, false);
+            orbit.Cancel();
+            Assert.That(orbit.Handle(UnityEngine.EventType.MouseDrag, UnityEngine.Vector2.one, false), Is.False);
+            Assert.That(orbit.Yaw, Is.Zero);
+        }
+
+        [Test]
         public void BuildNextStage_UsesGameSessionAndShowsTheNextStageImmediately_WhenResourcesAreEnough()
         {
             var session = CreateSession(new HouseFoundationCost(2, 3, 4, 5));
