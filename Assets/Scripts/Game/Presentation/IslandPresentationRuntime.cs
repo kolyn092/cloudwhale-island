@@ -269,15 +269,7 @@ namespace CloudWhale.Game.Presentation
             tailLeft.transform.rotation = Quaternion.Euler(0f, 0f, 28f); Parent(tailLeft, root);
             var tailRight = CreatePrimitive(PrimitiveType.Sphere, "Whale Tail Right", new Vector3(4.05f, -1.45f, 1.65f), new Vector3(1.7f, 0.35f, 1.25f), fin);
             tailRight.transform.rotation = Quaternion.Euler(0f, 0f, -28f); Parent(tailRight, root);
-            // A rising trail connects the exposed head to the cloud, outside the meadow.
-            var mist = new Color(0.84f, 0.96f, 1f);
-            for (var i = 0; i < 3; i++)
-            {
-                var size = 0.12f + i * 0.035f;
-                Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout Droplet " + i,
-                    new Vector3(-3.7f - i * 0.06f, 0.05f + i * 0.38f, 0.4f),
-                    new Vector3(size, size * 1.5f, size), mist), root);
-            }
+            // Keep the small cloud above the exposed head, outside the meadow.
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout Cloud Base", new Vector3(-3.88f, 1.27f, 0.4f), new Vector3(0.85f, 0.28f, 0.55f), Color.white), root);
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout Cloud Left", new Vector3(-4.08f, 1.43f, 0.4f), new Vector3(0.46f, 0.4f, 0.45f), Color.white), root);
             Parent(CreatePrimitive(PrimitiveType.Sphere, "Whale Spout Cloud Right", new Vector3(-3.7f, 1.49f, 0.4f), new Vector3(0.56f, 0.5f, 0.5f), Color.white), root);
