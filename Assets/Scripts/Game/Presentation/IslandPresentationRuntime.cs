@@ -285,13 +285,6 @@ namespace CloudWhale.Game.Presentation
             // Unity cylinders have height 2: the meadow top is exactly GroundHeight.
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "Island Meadow", new Vector3(0f, GroundHeight - 0.12f, 0f), new Vector3(7.8f, 0.12f, 5.4f), new Color(0.31f, 0.66f, 0.39f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "Island Soil", new Vector3(0f, 0.2f, 0f), new Vector3(7.65f, 0.27f, 5.25f), new Color(0.45f, 0.28f, 0.16f)), root);
-            for (var i = 0; i < 7; i++)
-            {
-                var angle = i * Mathf.PI * 2f / 7f;
-                var rock = CreatePrimitive(PrimitiveType.Sphere, "Island Rock", new Vector3(Mathf.Cos(angle) * 3.3f, GroundHeight, Mathf.Sin(angle) * 2.1f), new Vector3(0.55f, 0.36f, 0.48f), new Color(0.58f, 0.63f, 0.67f));
-                rock.transform.rotation = Quaternion.Euler(0f, i * 37f, 25f);
-                Parent(rock, root);
-            }
         }
 
         private void CreateCloud(Vector3 center, float scale, string name)
