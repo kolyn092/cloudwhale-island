@@ -8,6 +8,7 @@ namespace CloudWhale.Game.Presentation
     public sealed class IslandPresentationRuntime : MonoBehaviour
     {
         private static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
+        private const float GroundHeight = 0.7f;
 
         private IslandPresentationController presentation;
         private OpenGameProductionRuntime productionRuntime;
@@ -160,12 +161,12 @@ namespace CloudWhale.Game.Presentation
             CreateIsland();
             CreateCloud(new Vector3(-5f, 4f, 4f), 1.1f, "Cloud One");
             CreateCloud(new Vector3(5f, 3f, 5f), 0.9f, "Cloud Two");
-            CreatePineTree(new Vector3(-2.1f, 0.62f, 0.3f), 0.525f);
-            CreatePineTree(new Vector3(2.6f, 0.53f, -0.75f), 0.35f);
-            foundation = CreateHouseFoundation(new Vector3(0.65f, 0.76f, 0.2f));
-            framing = CreateHouseFraming(new Vector3(0.65f, 0.76f, 0.2f));
-            completedHouse = CreateCompletedHouse(new Vector3(0.65f, 0.76f, 0.2f));
-            var gardenCenter = new Vector3(-0.7f, 0.64f, 1.35f);
+            CreatePineTree(new Vector3(-2.1f, GroundHeight, 0.3f), 0.525f);
+            CreatePineTree(new Vector3(2.6f, GroundHeight, -0.75f), 0.35f);
+            foundation = CreateHouseFoundation(new Vector3(0.65f, GroundHeight, 0.2f));
+            framing = CreateHouseFraming(new Vector3(0.65f, GroundHeight, 0.2f));
+            completedHouse = CreateCompletedHouse(new Vector3(0.65f, GroundHeight, 0.2f));
+            var gardenCenter = new Vector3(-0.7f, GroundHeight, 1.35f);
             lockedGarden = CreateLockedGarden(gardenCenter);
             gardenFoundation = CreateGardenFoundation(gardenCenter);
             gardenFraming = CreateGardenFraming(gardenCenter);
@@ -281,12 +282,13 @@ namespace CloudWhale.Game.Presentation
         private void CreateIsland()
         {
             var root = CreateRoot("Floating Island Model");
-            Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Meadow", new Vector3(0f, 0.1f, 0f), new Vector3(7.8f, 1.25f, 5.4f), new Color(0.31f, 0.66f, 0.39f)), root);
-            Parent(CreatePrimitive(PrimitiveType.Sphere, "Island Soil", new Vector3(0f, -0.35f, 0f), new Vector3(7.0f, 1.15f, 4.75f), new Color(0.45f, 0.28f, 0.16f)), root);
+            // Unity cylinders have height 2: the meadow top is exactly GroundHeight.
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Island Meadow", new Vector3(0f, GroundHeight - 0.12f, 0f), new Vector3(7.8f, 0.12f, 5.4f), new Color(0.31f, 0.66f, 0.39f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cylinder, "Island Soil", new Vector3(0f, 0.2f, 0f), new Vector3(7.65f, 0.27f, 5.25f), new Color(0.45f, 0.28f, 0.16f)), root);
             for (var i = 0; i < 7; i++)
             {
                 var angle = i * Mathf.PI * 2f / 7f;
-                var rock = CreatePrimitive(PrimitiveType.Sphere, "Island Rock", new Vector3(Mathf.Cos(angle) * 3.3f, 0.23f, Mathf.Sin(angle) * 2.1f), new Vector3(0.55f, 0.36f, 0.48f), new Color(0.58f, 0.63f, 0.67f));
+                var rock = CreatePrimitive(PrimitiveType.Sphere, "Island Rock", new Vector3(Mathf.Cos(angle) * 3.3f, GroundHeight, Mathf.Sin(angle) * 2.1f), new Vector3(0.55f, 0.36f, 0.48f), new Color(0.58f, 0.63f, 0.67f));
                 rock.transform.rotation = Quaternion.Euler(0f, i * 37f, 25f);
                 Parent(rock, root);
             }
@@ -318,7 +320,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateLockedGarden(Vector3 center)
         {
             var root = CreateRoot("Garden Locked Vacant Lot Model");
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Clearing", center, new Vector3(2.05f, 0.48f, 1.75f), new Color(0.55f, 0.4f, 0.22f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Clearing", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.55f, 0.4f, 0.22f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Locked Sign Post", center + new Vector3(-0.72f, 0.5f, 0f), new Vector3(0.08f, 0.48f, 0.08f), new Color(0.36f, 0.2f, 0.09f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Locked Sign", center + new Vector3(-0.72f, 0.88f, 0f), new Vector3(0.62f, 0.32f, 0.08f), new Color(0.68f, 0.47f, 0.2f)), root);
             ScaleFacility(root, center);
@@ -328,7 +330,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateGardenFoundation(Vector3 center)
         {
             var root = CreateRoot("Garden Foundation Model");
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Soil", center, new Vector3(2.05f, 0.48f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
             foreach (var offset in new[] { -0.55f, 0.55f })
             {
                 Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Foundation Bed", center + new Vector3(offset, 0.18f, 0f), new Vector3(0.72f, 0.13f, 1.65f), new Color(0.63f, 0.36f, 0.16f)), root);
@@ -340,7 +342,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateGardenFraming(Vector3 center)
         {
             var root = CreateRoot("Garden Framing Model");
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Framing Soil", center, new Vector3(2.05f, 0.48f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Garden Framing Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
             foreach (var offset in new[] { new Vector3(-0.82f, 0.75f, -0.62f), new Vector3(0.82f, 0.75f, -0.62f), new Vector3(-0.82f, 0.75f, 0.62f), new Vector3(0.82f, 0.75f, 0.62f) })
             {
                 Parent(CreatePrimitive(PrimitiveType.Cylinder, "Garden Framing Post", center + offset, new Vector3(0.08f, 0.7f, 0.08f), new Color(0.39f, 0.22f, 0.1f)), root);
@@ -354,7 +356,7 @@ namespace CloudWhale.Game.Presentation
         private GameObject CreateCompletedGarden(Vector3 center)
         {
             var root = CreateRoot("Completed Garden Model");
-            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed Garden Soil", center, new Vector3(2.05f, 0.48f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
+            Parent(CreatePrimitive(PrimitiveType.Cube, "Completed Garden Soil", center, new Vector3(2.05f, 0.24f, 1.75f), new Color(0.39f, 0.23f, 0.1f)), root);
             var flowerColors = new[] { new Color(1f, 0.45f, 0.6f), new Color(1f, 0.86f, 0.4f), new Color(0.73f, 0.56f, 1f) };
             for (var row = 0; row < 2; row++)
             {
@@ -426,7 +428,7 @@ namespace CloudWhale.Game.Presentation
             root.transform.position = center;
             var wall = new Color(0.95f, 0.82f, 0.57f);
             var roof = new Color(0.64f, 0.22f, 0.18f);
-            // The island is curved: embed the footing into it, with its top flush with the walls.
+            // Embed the footing into the ground, with its top flush with the walls.
             Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Footing", center + new Vector3(0f, -0.25f, 0f), new Vector3(2.13f, 0.5f, 1.73f), new Color(0.58f, 0.55f, 0.48f)), root);
             Parent(CreatePrimitive(PrimitiveType.Cube, "Completed House Walls", center + new Vector3(0f, 0.75f, 0f), new Vector3(2.05f, 1.5f, 1.65f), wall), root);
             // Even the raised edge of the tilted roof underside must meet the wall top (1.5).
